@@ -1,0 +1,2 @@
+python paired_images_data_gen_server.py --connection --port 50006 --num_robot_poses 40000 --num_cam_poses_per_robot_pose 50 &
+python paired_images_data_gen_client.py --connection --port 50006 --num_robot_poses 40000 --num_cam_poses_per_robot_pose 50 
