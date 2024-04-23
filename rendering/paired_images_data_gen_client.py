@@ -40,10 +40,13 @@ class TargetEnvWrapper:
             pos += cr
         return data
     
-    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10):
+    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, start_id=0):
+        # read desired joint angles
+        if reference_joint_angles_path is not None:
+            joint_angles = np.loadtxt(reference_joint_angles_path)
+            num_robot_poses = joint_angles.shape[0]
         
-        
-        for pose_index in range(num_robot_poses):
+        for pose_index in range(start_id, min(start_id+1000, num_robot_poses)):
             print(pose_index)
             counter = 0
             os.makedirs(os.path.join(save_paired_images_folder_path, f"{target_name.lower()}_rgb", str(pose_index)), exist_ok=True)
@@ -99,7 +102,7 @@ class TargetEnvWrapper:
                 self.target_env.update_camera()
                     
                 # print("Desired camera pose: ", camera_pose)
-                # print("Actual camera pose: ", self.target_env.camera_wrapper.get_camera_pose_world_frame())
+                print("Actual camera pose: ", self.target_env.camera_wrapper.get_camera_pose_world_frame())
                 target_robot_img, target_robot_seg_img = self.target_env.get_observation(white_background=True)
                 
                 
@@ -147,6 +150,8 @@ if __name__ == "__main__":
     parser.add_argument("--num_robot_poses", type=int, default=5, help="(optional) (optional) set seed")
     parser.add_argument("--num_cam_poses_per_robot_pose", type=int, default=5, help="(optional) (optional) set seed")
     parser.add_argument("--save_paired_images_folder_path", type=str, default="paired_images", help="(optional) folder path to save the paired images")
+    parser.add_argument("--reference_joint_angles_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the joint angles file (np.savetxt)")
+    parser.add_argument("--start_id", type=int, default=0, help="(optional) starting index of the robot poses")
     args = parser.parse_args()
     
     
@@ -160,7 +165,7 @@ if __name__ == "__main__":
     
     
     target_env = TargetEnvWrapper(target_name, connection=args.connection, port=args.port)
-    target_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose)
+    target_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, start_id=args.start_id)
 
     target_env.target_env.env.close_renderer()
         

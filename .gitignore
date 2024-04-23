@@ -117,7 +117,7 @@ mjkey.txt
 macros_private.py
 
 # data folders
-rendering/paired_images/
+rendering/data/
 *.png
 # videos
 *.mp4

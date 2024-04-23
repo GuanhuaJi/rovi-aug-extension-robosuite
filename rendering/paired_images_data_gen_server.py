@@ -190,10 +190,10 @@ class CameraWrapper:
         self.cam_tree.set("quat", "{} {} {} {}".format(camera_quat[0], camera_quat[1], camera_quat[2], camera_quat[3]))
         print(ET.tostring(self.cam_tree, encoding="utf8").decode("utf8"))
         
-    def perturb_camera(self, seed=None):
+    def perturb_camera(self, seed=None, angle=10, scale=0.15):
         np.random.seed(seed)
-        self.camera_mover.rotate_camera(point=None, axis=np.random.uniform(-1, 1, 3), angle=10)
-        self.camera_mover.move_camera(direction=np.random.uniform(-1, 1, 3), scale=0.15)
+        self.camera_mover.rotate_camera(point=None, axis=np.random.uniform(-1, 1, 3), angle=angle)
+        self.camera_mover.move_camera(direction=np.random.uniform(-1, 1, 3), scale=scale)
         # for _ in range(50):
         #     self.env.sim.forward()
         #     self.env.sim.step()
@@ -266,7 +266,7 @@ class RobotCameraWrapper:
             #         "Source: ", current_pose,
             #         "Target: ", target_pose
             #         )
-            return False, None
+            return False, current_pose
 
     def set_robot_joint_positions(self, joint_angles=None):
         if joint_angles is None:
@@ -290,7 +290,7 @@ class RobotCameraWrapper:
         seg_img = obs[f'{view}_segmentation_robot_only']
         # count the number of robot pixels
         num_robot_pixels = np.sum(seg_img)
-        if num_robot_pixels <= 100:
+        if num_robot_pixels <= 500:
             print(num_robot_pixels, " robot pixels in the image")
             return None, None
         
@@ -337,10 +337,14 @@ class SourceEnvWrapper:
             pos += cr
         return data
 
-    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images"):
+    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, start_id=0):
+        # read desired joint angles
+        if reference_joint_angles_path is not None:
+            joint_angles = np.loadtxt(reference_joint_angles_path)
+            num_robot_poses = joint_angles.shape[0]
+            camera_reference_pose = np.array([0.5 , 0.04  , 1.37, 0.27104094, 0.27104094, 0.65309786, 0.65309786])
         
-        
-        for pose_index in range(num_robot_poses):
+        for pose_index in range(start_id, min(start_id+1000, num_robot_poses)):
             print(pose_index)
             counter = 0
             os.makedirs(os.path.join(save_paired_images_folder_path, f"panda_rgb", str(pose_index)), exist_ok=True)
@@ -349,10 +353,27 @@ class SourceEnvWrapper:
             # sample robot eef pose
             both_reached = False
             while not both_reached:
-                target_pose = sample_robot_ee_pose()
-                source_reached, source_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=target_pose)
+                if reference_joint_angles_path is not None:
+                    joint_angle = joint_angles[pose_index]
+                    # self.source_env.set_robot_joint_positions(joint_angle)
+                    # source_reached_pose = self.source_env.compute_eef_pose()
+                    # target_pose = source_reached_pose
+                    # source_reached = True
+                    target_pos, target_quat = T.mat2pose(joint_angle.reshape((4, 4)))
+                    target_quat = T.quat_multiply(target_quat, np.array([ 0, 0, -0.7071068, 0.7071068 ]))
+                    target_pose = np.concatenate((target_pos, target_quat))
+                    source_reached, source_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=target_pose)
+                    target_pose = source_reached_pose # to avoid source not reaching its target pose
+                else:
+                    target_pose = sample_robot_ee_pose()
+                    source_reached, source_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=target_pose)
                 if not source_reached:
-                    continue
+                    if reference_joint_angles_path is not None:
+                        print("Source robot failed to reach the desired pose")
+                        # ideal: jump out of the while loop and directly go to the next pose
+                        # the issue is the index on the target robot side will be messed up.
+                    else:
+                        continue
                 
                 ########### Send message to target robot ############
                 variable = Data()
@@ -382,23 +403,36 @@ class SourceEnvWrapper:
                 # self.conn.send(message_length)
                 # self.conn.send(data_string)
                 
-                if not target_env_robot_state.success:      
+                if not target_env_robot_state.success:
+                    if reference_joint_angles_path is not None:
+                        print("Target robot failed to reach the desired pose")
                     continue          
                 else:
                     both_reached = True
                     print("Source robot pose: ", source_reached_pose)
             
-            
-            cam_positions, cam_quaternions = sample_half_hemisphere(num_cam_poses_per_robot_pose) # Generate random camera poses
+            if camera_reference_pose is not None:
+                ref_cam_position, ref_cam_quaternion = camera_reference_pose[:3], camera_reference_pose[3:]
+                cam_positions, cam_quaternions = [ref_cam_position] * num_cam_poses_per_robot_pose, [ref_cam_quaternion] * num_cam_poses_per_robot_pose
+            else:
+                cam_positions, cam_quaternions = sample_half_hemisphere(num_cam_poses_per_robot_pose) # Generate random camera poses
             # Capture images from each camera pose
             for i, (pos, quat) in enumerate(zip(cam_positions, cam_quaternions)):
-                self.source_env.camera_wrapper.set_camera_pose(pos=pos, quat=quat, offset=target_pose[:3])
-                self.source_env.camera_wrapper.perturb_camera()
-                camera_pose = self.source_env.camera_wrapper.get_camera_pose_world_frame()
-                # print("Desired camera pose: ", pos+target_pose[:3], quat)
-                # print("Actual camera pose: ", camera_pose)
-                # sample an fov
-                fov = np.random.uniform(30, 60)
+                if camera_reference_pose is not None:
+                    # just set the camera pose to the reference pose with slight perturbation
+                    self.source_env.camera_wrapper.set_camera_pose(pos=pos, quat=quat)
+                    self.source_env.camera_wrapper.perturb_camera(angle=8, scale=0.1)
+                    camera_pose = self.source_env.camera_wrapper.get_camera_pose_world_frame()
+                    fov = np.random.uniform(45, 60)
+                    print("Actual camera pose: ", camera_pose)
+                else:
+                    self.source_env.camera_wrapper.set_camera_pose(pos=pos, quat=quat, offset=target_pose[:3])
+                    self.source_env.camera_wrapper.perturb_camera()
+                    camera_pose = self.source_env.camera_wrapper.get_camera_pose_world_frame()
+                    # print("Desired camera pose: ", pos+target_pose[:3], quat)
+                    # print("Actual camera pose: ", camera_pose)
+                    # sample an fov
+                    fov = np.random.uniform(30, 60)
                 self.source_env.camera_wrapper.set_camera_fov(fov=fov)
                 self.source_env.update_camera()
                 
@@ -458,10 +492,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--connection", action='store_true', help="if True, the source robot will wait for the target robot to connect to it")
     parser.add_argument("--port", type=int, default=50007, help="(optional) port for socket connection")
-    parser.add_argument("--seed", type=int, default=0, help="(optional) (optional) set seed")
-    parser.add_argument("--num_robot_poses", type=int, default=5, help="(optional) (optional) set seed")
-    parser.add_argument("--num_cam_poses_per_robot_pose", type=int, default=5, help="(optional) (optional) set seed")
+    parser.add_argument("--seed", type=int, default=0, help="(optional) set seed")
+    parser.add_argument("--num_robot_poses", type=int, default=5, help="(optional) number of robot poses to sample")
+    parser.add_argument("--num_cam_poses_per_robot_pose", type=int, default=5, help="(optional) number of camera poses per robot pose to sample")
     parser.add_argument("--save_paired_images_folder_path", type=str, default="paired_images", help="(optional) folder path to save the paired images")
+    parser.add_argument("--reference_joint_angles_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the joint angles file (np.savetxt)")
+    parser.add_argument("--start_id", type=int, default=0, help="(optional) starting index of the robot poses")
     args = parser.parse_args()
     
     
@@ -475,7 +511,7 @@ if __name__ == "__main__":
     
     
     source_env = SourceEnvWrapper(source_name, connection=args.connection, port=args.port)
-    source_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path)
+    source_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, start_id=args.start_id)
 
     source_env.source_env.env.close_renderer()
     
