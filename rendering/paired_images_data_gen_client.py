@@ -14,8 +14,8 @@ from paired_images_data_gen_server import Data, RobotCameraWrapper
 
 
 class TargetEnvWrapper:
-    def __init__(self, target_name, connection=None, port=50007):
-        self.target_env = RobotCameraWrapper(robotname=target_name)
+    def __init__(self, target_name, target_gripper, connection=None, port=50007):
+        self.target_env = RobotCameraWrapper(robotname=target_name, grippername=target_gripper)
         self.target_name = target_name
         if connection:
             HOST = 'localhost'
@@ -40,13 +40,19 @@ class TargetEnvWrapper:
             pos += cr
         return data
     
-    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, start_id=0):
+    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, start_id=0):
         # read desired joint angles
+        if reference_ee_states_path is not None:
+            ee_states = np.loadtxt(reference_ee_states_path)
+            num_robot_poses = joint_angles.shape[0]
+        
         if reference_joint_angles_path is not None:
             joint_angles = np.loadtxt(reference_joint_angles_path)
             num_robot_poses = joint_angles.shape[0]
         
         for pose_index in range(start_id, min(start_id+1000, num_robot_poses)):
+            if pose_index % 30 == 0 and reference_joint_angles_path is not None: # to avoid simulation becoming unstable
+                self.target_env.env.reset()
             print(pose_index)
             counter = 0
             os.makedirs(os.path.join(save_paired_images_folder_path, f"{target_name.lower()}_rgb", str(pose_index)), exist_ok=True)
@@ -63,6 +69,7 @@ class TargetEnvWrapper:
                 assert source_env_robot_state.message == "Source reached a target pose. Send target pose", "Wrong synchronization"
                 target_pose=source_env_robot_state.robot_pose
                 target_reached, targt_reached_pose = self.target_env.drive_robot_to_target_pose(target_pose=target_pose)
+                self.target_env.open_close_gripper(gripper_open=source_env_robot_state.gripper_open)
                 
                 ########### Send message to source robot ############
                 variable = Data()
@@ -79,7 +86,7 @@ class TargetEnvWrapper:
                     continue
                 else:
                     both_reached = True
-                    print("Target robot pose: ", targt_reached_pose)
+                    # print("Target robot pose: ", targt_reached_pose)
             
             
             # Capture images from each camera pose
@@ -102,7 +109,7 @@ class TargetEnvWrapper:
                 self.target_env.update_camera()
                     
                 # print("Desired camera pose: ", camera_pose)
-                print("Actual camera pose: ", self.target_env.camera_wrapper.get_camera_pose_world_frame())
+                # print("Actual camera pose: ", self.target_env.camera_wrapper.get_camera_pose_world_frame())
                 target_robot_img, target_robot_seg_img = self.target_env.get_observation(white_background=True)
                 
                 
@@ -121,6 +128,8 @@ class TargetEnvWrapper:
                     # breakpoint()
                     continue
                 
+                target_robot_img = cv2.resize(target_robot_img, (256, 256), interpolation=cv2.INTER_LINEAR)
+                target_robot_seg_img = cv2.resize(target_robot_seg_img, (256, 256), interpolation=cv2.INTER_NEAREST)
                 cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name.lower()}_rgb", f"{pose_index}/{counter}.jpg"), cv2.cvtColor(target_robot_img, cv2.COLOR_RGB2BGR))
                 cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name.lower()}_mask", f"{pose_index}/{counter}.jpg"), target_robot_seg_img * 255)
                 counter += 1
@@ -147,15 +156,18 @@ if __name__ == "__main__":
     parser.add_argument("--connection", action='store_true', help="if True, the source robot will wait for the target robot to connect to it")
     parser.add_argument("--port", type=int, default=50007, help="(optional) port for socket connection")
     parser.add_argument("--seed", type=int, default=0, help="(optional) (optional) set seed")
+    parser.add_argument("--target_gripper", type=str, default="Robotiq85Gripper", help="PandaGripper or Robotiq85Gripper")
     parser.add_argument("--num_robot_poses", type=int, default=5, help="(optional) (optional) set seed")
     parser.add_argument("--num_cam_poses_per_robot_pose", type=int, default=5, help="(optional) (optional) set seed")
     parser.add_argument("--save_paired_images_folder_path", type=str, default="paired_images", help="(optional) folder path to save the paired images")
     parser.add_argument("--reference_joint_angles_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the joint angles file (np.savetxt)")
+    parser.add_argument("--reference_ee_states_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the ee state file (np.savetxt)")
     parser.add_argument("--start_id", type=int, default=0, help="(optional) starting index of the robot poses")
     args = parser.parse_args()
     
     
     target_name = "UR5e"
+    target_gripper = "Robotiq85Gripper"
 
     # Save the captured images
     save_paired_images_folder_path = args.save_paired_images_folder_path
@@ -164,8 +176,8 @@ if __name__ == "__main__":
     
     
     
-    target_env = TargetEnvWrapper(target_name, connection=args.connection, port=args.port)
-    target_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, start_id=args.start_id)
+    target_env = TargetEnvWrapper(target_name, target_gripper, connection=args.connection, port=args.port)
+    target_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, reference_ee_states_path=args.reference_ee_states_path, start_id=args.start_id)
 
     target_env.target_env.env.close_renderer()
         

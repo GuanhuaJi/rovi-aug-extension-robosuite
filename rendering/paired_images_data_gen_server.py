@@ -118,6 +118,28 @@ def compute_pose_error(current_pose, target_pose):
     return error
             
 
+def change_brightness(img, value=30, mask=None):
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    
+    if mask is None:
+        mask = np.ones_like(v)
+    else:
+        mask = mask.squeeze()
+    # Apply mask to the brightness channel
+    if value > 0:
+        lim = 255 - value
+        v[(v > lim) & (mask == 1)] = 255
+        v[(v <= lim) & (mask == 1)] += value
+    else:
+        lim = -value
+        v[(v < lim) & (mask == 1)] = 0
+        v[(v >= lim) & (mask == 1)] -= lim
+
+    final_hsv = cv2.merge((h, s, v))
+    img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
+    return img
+
 class Data:
     obs = {}
     robot_pose = np.zeros(7)
@@ -126,6 +148,7 @@ class Data:
     done = False
     success = False
     message = ""        
+    gripper_open = True
 
 
 class CameraWrapper:
@@ -201,11 +224,12 @@ class CameraWrapper:
         
 
 class RobotCameraWrapper:
-    def __init__(self, robotname="Panda"):
+    def __init__(self, robotname="Panda", grippername="PandaGripper"):
         options = {}
         self.env = suite.make(
             **options,
             robots=robotname,
+            gripper_types=grippername,
             env_name="Empty",
             has_renderer=True,  # no on-screen renderer
             has_offscreen_renderer=True,  # no off-screen renderer
@@ -215,8 +239,8 @@ class RobotCameraWrapper:
             control_freq=20,
             renderer="mujoco",
             camera_names = ["agentview"],  # You can add more camera names if needed
-            camera_heights = 256,
-            camera_widths = 256,
+            camera_heights = 180,
+            camera_widths = 320,
             camera_depths = True,
             camera_segmentations = "robot_only",
             hard_reset=False,
@@ -271,11 +295,19 @@ class RobotCameraWrapper:
     def set_robot_joint_positions(self, joint_angles=None):
         if joint_angles is None:
             joint_angles = self.default_joint_angles
-        for _ in range(50):
+        for _ in range(200):
             self.env.robots[0].set_robot_joint_positions(joint_angles)
             self.env.sim.forward()
             self.env.sim.step()
             self.env._update_observables()
+    
+    def open_close_gripper(self, gripper_open=True):
+        self.env.robots[0].controller.use_delta = True # change to delta pose
+        action = np.zeros(7)
+        if not gripper_open:
+            action[-1] = 1
+        for _ in range(5):            
+            obs, _, _, _ = self.env.step(action)
     
     def update_camera(self):
         for _ in range(50):
@@ -306,8 +338,8 @@ class RobotCameraWrapper:
 
 
 class SourceEnvWrapper:
-    def __init__(self, source_name, connection=None, port=50007):
-        self.source_env = RobotCameraWrapper(robotname=source_name)
+    def __init__(self, source_name, source_gripper, connection=None, port=50007):
+        self.source_env = RobotCameraWrapper(robotname=source_name, grippername=source_gripper)
         self.source_name = source_name
         if connection:
             HOST = 'localhost'
@@ -337,14 +369,34 @@ class SourceEnvWrapper:
             pos += cr
         return data
 
-    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, start_id=0):
+    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, start_id=0):
         # read desired joint angles
+        if reference_ee_states_path is not None:
+            ee_states = np.loadtxt(reference_ee_states_path)
+            num_robot_poses = joint_angles.shape[0]
+            # viola
+            camera_reference_pose = np.array([0.5 , 0.04  , 1.37, 0.27104094, 0.27104094, 0.65309786, 0.65309786])
+            fov_range = (45, 60)
+            
         if reference_joint_angles_path is not None:
             joint_angles = np.loadtxt(reference_joint_angles_path)
             num_robot_poses = joint_angles.shape[0]
-            camera_reference_pose = np.array([0.5 , 0.04  , 1.37, 0.27104094, 0.27104094, 0.65309786, 0.65309786])
+            # mirage
+            camera_pos_mirage = np.array([0.68,0.37,0.47]) + np.array([-0.6, 0.0, 0.912])
+            camera_rot_mirage = np.array([[-0.87844054,  0.32722496, -0.34823273],
+                                        [ 0.47077211,  0.46765169, -0.74811464],
+                                        [-0.08195015, -0.82111249, -0.56485259]])
+            # robosuite camera is not right, down, forward but right, up, backward
+            camera_rot_mirage[:, 1] = -camera_rot_mirage[:, 1]
+            camera_rot_mirage[:, 2] = -camera_rot_mirage[:, 2]
+            camera_quat_mirage = T.mat2quat(camera_rot_mirage)
+            camera_reference_pose = np.concatenate((camera_pos_mirage, camera_quat_mirage))
+            fov_range = (55, 85)
         
         for pose_index in range(start_id, min(start_id+1000, num_robot_poses)):
+            if pose_index % 30 == 0 and reference_joint_angles_path is not None: # to avoid simulation becoming unstable
+                self.source_env.env.reset()
+            
             print(pose_index)
             counter = 0
             os.makedirs(os.path.join(save_paired_images_folder_path, f"panda_rgb", str(pose_index)), exist_ok=True)
@@ -353,17 +405,24 @@ class SourceEnvWrapper:
             # sample robot eef pose
             both_reached = False
             while not both_reached:
-                if reference_joint_angles_path is not None:
-                    joint_angle = joint_angles[pose_index]
-                    # self.source_env.set_robot_joint_positions(joint_angle)
-                    # source_reached_pose = self.source_env.compute_eef_pose()
-                    # target_pose = source_reached_pose
-                    # source_reached = True
-                    target_pos, target_quat = T.mat2pose(joint_angle.reshape((4, 4)))
+                # sample gripper opening/closing with 35% probability of closing
+                gripper_open = np.random.choice([True, False], p=[0.65, 0.35])
+                if reference_ee_states_path is not None:
+                    ee_state = ee_states[pose_index]
+                    target_pos, target_quat = T.mat2pose(ee_state.reshape((4, 4)))
                     target_quat = T.quat_multiply(target_quat, np.array([ 0, 0, -0.7071068, 0.7071068 ]))
                     target_pose = np.concatenate((target_pos, target_quat))
                     source_reached, source_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=target_pose)
                     target_pose = source_reached_pose # to avoid source not reaching its target pose
+                elif reference_joint_angles_path is not None:
+                    joint_angle = joint_angles[pose_index]
+                    # add noise to joint angles
+                    joint_angle += np.random.normal(0, 0.05, 7)
+                    joint_angle[-1] += np.random.normal(0, 0.5)
+                    self.source_env.set_robot_joint_positions(joint_angle)
+                    source_reached_pose = self.source_env.compute_eef_pose()
+                    source_reached, source_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=source_reached_pose)
+                    target_pose = source_reached_pose
                 else:
                     target_pose = sample_robot_ee_pose()
                     source_reached, source_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=target_pose)
@@ -374,10 +433,13 @@ class SourceEnvWrapper:
                         # the issue is the index on the target robot side will be messed up.
                     else:
                         continue
+                # gripper action
+                self.source_env.open_close_gripper(gripper_open=gripper_open)
                 
                 ########### Send message to target robot ############
                 variable = Data()
                 variable.robot_pose = target_pose
+                variable.gripper_open = gripper_open
                 variable.message = "Source reached a target pose. Send target pose"
                 # Pickle the object and send it to the server
                 data_string = pickle.dumps(variable)
@@ -409,7 +471,7 @@ class SourceEnvWrapper:
                     continue          
                 else:
                     both_reached = True
-                    print("Source robot pose: ", source_reached_pose)
+                    # print("Source robot pose: ", source_reached_pose)
             
             if camera_reference_pose is not None:
                 ref_cam_position, ref_cam_quaternion = camera_reference_pose[:3], camera_reference_pose[3:]
@@ -423,8 +485,8 @@ class SourceEnvWrapper:
                     self.source_env.camera_wrapper.set_camera_pose(pos=pos, quat=quat)
                     self.source_env.camera_wrapper.perturb_camera(angle=8, scale=0.1)
                     camera_pose = self.source_env.camera_wrapper.get_camera_pose_world_frame()
-                    fov = np.random.uniform(45, 60)
-                    print("Actual camera pose: ", camera_pose)
+                    fov = np.random.uniform(fov_range[0], fov_range[1])
+                    # print("Actual camera pose: ", camera_pose)
                 else:
                     self.source_env.camera_wrapper.set_camera_pose(pos=pos, quat=quat, offset=target_pose[:3])
                     self.source_env.camera_wrapper.perturb_camera()
@@ -465,7 +527,10 @@ class SourceEnvWrapper:
                 if not success:
                     continue
                 
-                
+                # sample a random integer between -50 and 50
+                source_robot_img = change_brightness(source_robot_img, value=np.random.randint(-50, 50), mask=source_robot_seg_img)
+                source_robot_img = cv2.resize(source_robot_img, (256, 256), interpolation=cv2.INTER_LINEAR)
+                source_robot_seg_img = cv2.resize(source_robot_seg_img, (256, 256), interpolation=cv2.INTER_NEAREST)
                 cv2.imwrite(os.path.join(save_paired_images_folder_path, f"panda_rgb", f"{pose_index}/{counter}.jpg"), cv2.cvtColor(source_robot_img, cv2.COLOR_RGB2BGR))
                 cv2.imwrite(os.path.join(save_paired_images_folder_path, f"panda_mask", f"{pose_index}/{counter}.jpg"), source_robot_seg_img * 255)
                 counter += 1
@@ -481,6 +546,8 @@ if __name__ == "__main__":
                              PickPlaceCan, Door, Wipe, TwoArmLift, TwoArmPegInHole, TwoArmHandover
 
     Possible robots: Baxter, IIWA, Jaco, Kinova3, Panda, Sawyer, UR5e
+    Possible grippers: 'RethinkGripper', 'PandaGripper', 'JacoThreeFingerGripper', 'JacoThreeFingerDexterousGripper', 
+    'WipingGripper', 'Robotiq85Gripper', 'Robotiq140Gripper', 'RobotiqThreeFingerGripper', 'RobotiqThreeFingerDexterousGripper'
     """
 
     
@@ -493,15 +560,18 @@ if __name__ == "__main__":
     parser.add_argument("--connection", action='store_true', help="if True, the source robot will wait for the target robot to connect to it")
     parser.add_argument("--port", type=int, default=50007, help="(optional) port for socket connection")
     parser.add_argument("--seed", type=int, default=0, help="(optional) set seed")
+    parser.add_argument("--source_gripper", type=str, default="PandaGripper", help="PandaGripper or Robotiq85Gripper")
     parser.add_argument("--num_robot_poses", type=int, default=5, help="(optional) number of robot poses to sample")
     parser.add_argument("--num_cam_poses_per_robot_pose", type=int, default=5, help="(optional) number of camera poses per robot pose to sample")
     parser.add_argument("--save_paired_images_folder_path", type=str, default="paired_images", help="(optional) folder path to save the paired images")
     parser.add_argument("--reference_joint_angles_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the joint angles file (np.savetxt)")
+    parser.add_argument("--reference_ee_states_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the ee state file (np.savetxt)")
     parser.add_argument("--start_id", type=int, default=0, help="(optional) starting index of the robot poses")
     args = parser.parse_args()
     
     
     source_name = "Panda"
+    source_gripper = args.source_gripper
 
     # Save the captured images
     save_paired_images_folder_path = args.save_paired_images_folder_path
@@ -510,8 +580,8 @@ if __name__ == "__main__":
     
     
     
-    source_env = SourceEnvWrapper(source_name, connection=args.connection, port=args.port)
-    source_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, start_id=args.start_id)
+    source_env = SourceEnvWrapper(source_name, source_gripper, connection=args.connection, port=args.port)
+    source_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, reference_ee_states_path=args.reference_ee_states_path, start_id=args.start_id)
 
     source_env.source_env.env.close_renderer()
     
