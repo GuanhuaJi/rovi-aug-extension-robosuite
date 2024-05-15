@@ -14,8 +14,8 @@ from paired_images_data_gen_server import Data, RobotCameraWrapper
 
 
 class TargetEnvWrapper:
-    def __init__(self, target_name, target_gripper, connection=None, port=50007):
-        self.target_env = RobotCameraWrapper(robotname=target_name, grippername=target_gripper)
+    def __init__(self, target_name, target_gripper, camera_height=256, camera_width=256, connection=None, port=50007):
+        self.target_env = RobotCameraWrapper(robotname=target_name, grippername=target_gripper, camera_height=camera_height, camera_width=camera_width)
         self.target_name = target_name
         if connection:
             HOST = 'localhost'
@@ -40,15 +40,24 @@ class TargetEnvWrapper:
             pos += cr
         return data
     
-    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, start_id=0):
+    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, robot_dataset=None, start_id=0):
         # read desired joint angles
         if reference_ee_states_path is not None:
             ee_states = np.loadtxt(reference_ee_states_path)
-            num_robot_poses = joint_angles.shape[0]
+            num_robot_poses = ee_states.shape[0]
         
         if reference_joint_angles_path is not None:
             joint_angles = np.loadtxt(reference_joint_angles_path)
             num_robot_poses = joint_angles.shape[0]
+        
+        if robot_dataset is not None:
+            from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
+            robot_dataset_info = ROBOT_CAMERA_POSES_DICT[robot_dataset]
+            reference_joint_angles_path = robot_dataset_info["robot_joint_angles_path"]
+            reference_ee_states_path = robot_dataset_info["robot_ee_states_path"]
+            joint_angles = np.loadtxt(reference_joint_angles_path)
+            ee_states = np.loadtxt(reference_ee_states_path)
+            num_robot_poses = min(joint_angles.shape[0], 10000)
         
         for pose_index in range(start_id, min(start_id+1000, num_robot_poses)):
             if pose_index % 30 == 0 and reference_joint_angles_path is not None: # to avoid simulation becoming unstable
@@ -160,6 +169,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_robot_poses", type=int, default=5, help="(optional) (optional) set seed")
     parser.add_argument("--num_cam_poses_per_robot_pose", type=int, default=5, help="(optional) (optional) set seed")
     parser.add_argument("--save_paired_images_folder_path", type=str, default="paired_images", help="(optional) folder path to save the paired images")
+    parser.add_argument("--robot_dataset", type=str, help="(optional) to match the robot poses from a dataset, provide the dataset name")
     parser.add_argument("--reference_joint_angles_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the joint angles file (np.savetxt)")
     parser.add_argument("--reference_ee_states_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the ee state file (np.savetxt)")
     parser.add_argument("--start_id", type=int, default=0, help="(optional) starting index of the robot poses")
@@ -174,10 +184,17 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(save_paired_images_folder_path, "{}_rgb".format(target_name.lower())), exist_ok=True)
     os.makedirs(os.path.join(save_paired_images_folder_path, "{}_mask".format(target_name.lower())), exist_ok=True)
     
+    if args.robot_dataset is not None:
+        from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
+        robot_dataset_info = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
+        camera_height = robot_dataset_info["camera_heights"]
+        camera_width = robot_dataset_info["camera_widths"]
+    else:
+        camera_height = 256
+        camera_width = 256
     
-    
-    target_env = TargetEnvWrapper(target_name, target_gripper, connection=args.connection, port=args.port)
-    target_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, reference_ee_states_path=args.reference_ee_states_path, start_id=args.start_id)
+    target_env = TargetEnvWrapper(target_name, target_gripper, camera_height, camera_width, connection=args.connection, port=args.port)
+    target_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, reference_ee_states_path=args.reference_ee_states_path, robot_dataset=args.robot_dataset, start_id=args.start_id)
 
     target_env.target_env.env.close_renderer()
         
