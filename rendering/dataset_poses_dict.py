@@ -135,8 +135,8 @@ ROBOT_CAMERA_POSES_DICT = {
         "camera_widths": 320,
     },
     "viola": {
-        "robot_joint_angles_path": "/home/lawrence/xembody_followup/viola_dataset/bowldomain/joint_states.txt",
-        "robot_ee_states_path": "/home/lawrence/xembody_followup/viola_dataset/bowldomain/ee_states.txt",
+        "robot_joint_angles_path": "/home/lawrence/xembody_followup/viola_dataset/joint_states.txt",
+        "robot_ee_states_path": "/home/lawrence/xembody_followup/viola_dataset/ee_states.txt",
         "camera_position": np.array([1.1, 0.04, 0.458]),
         "camera_orientation": np.array([[-4.47034836e-08, 7.06147254e-01, -7.08065033e-01],
                                     [ 1.00000000e+00, 4.47034836e-08,  0.00000000e+00],

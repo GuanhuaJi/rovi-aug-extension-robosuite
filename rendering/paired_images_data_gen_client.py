@@ -10,7 +10,7 @@ import robosuite as suite
 import robosuite.macros as macros
 macros.IMAGE_CONVENTION = "opencv"
 
-from paired_images_data_gen_server import Data, RobotCameraWrapper
+from paired_images_data_gen_server import Data, RobotCameraWrapper, change_brightness
 
 
 class TargetEnvWrapper:
@@ -60,11 +60,12 @@ class TargetEnvWrapper:
             num_robot_poses = min(joint_angles.shape[0], 10000)
         
         for pose_index in range(start_id, min(start_id+1000, num_robot_poses)):
-            if pose_index % 30 == 0 and reference_joint_angles_path is not None: # to avoid simulation becoming unstable
+            if pose_index % 30 == 0: # to avoid simulation becoming unstable
                 self.target_env.env.reset()
             print(pose_index)
             counter = 0
             os.makedirs(os.path.join(save_paired_images_folder_path, f"{target_name.lower()}_rgb", str(pose_index)), exist_ok=True)
+            os.makedirs(os.path.join(save_paired_images_folder_path, f"{target_name.lower()}_rgb_brightness_augmented", str(pose_index)), exist_ok=True)
             os.makedirs(os.path.join(save_paired_images_folder_path, f"{target_name.lower()}_mask", str(pose_index)), exist_ok=True)
             
             # sample robot eef pose
@@ -137,9 +138,14 @@ class TargetEnvWrapper:
                     # breakpoint()
                     continue
                 
+                # sample a random integer between -40 and 40
+                target_robot_img_brightness_augmented = change_brightness(target_robot_img, value=np.random.randint(-40, 40), mask=target_robot_seg_img)
+                target_robot_img = cv2.resize(target_robot_img, (256, 256), interpolation=cv2.INTER_LINEAR)
+                target_robot_img_brightness_augmented = cv2.resize(target_robot_img_brightness_augmented, (256, 256), interpolation=cv2.INTER_LINEAR)
                 target_robot_img = cv2.resize(target_robot_img, (256, 256), interpolation=cv2.INTER_LINEAR)
                 target_robot_seg_img = cv2.resize(target_robot_seg_img, (256, 256), interpolation=cv2.INTER_NEAREST)
                 cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name.lower()}_rgb", f"{pose_index}/{counter}.jpg"), cv2.cvtColor(target_robot_img, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name.lower()}_rgb_brightness_augmented", f"{pose_index}/{counter}.jpg"), cv2.cvtColor(target_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
                 cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name.lower()}_mask", f"{pose_index}/{counter}.jpg"), target_robot_seg_img * 255)
                 counter += 1
 
@@ -182,6 +188,7 @@ if __name__ == "__main__":
     # Save the captured images
     save_paired_images_folder_path = args.save_paired_images_folder_path
     os.makedirs(os.path.join(save_paired_images_folder_path, "{}_rgb".format(target_name.lower())), exist_ok=True)
+    os.makedirs(os.path.join(save_paired_images_folder_path, "{}_rgb_brightness_augmented".format(target_name.lower())), exist_ok=True)
     os.makedirs(os.path.join(save_paired_images_folder_path, "{}_mask".format(target_name.lower())), exist_ok=True)
     
     if args.robot_dataset is not None:

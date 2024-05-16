@@ -322,7 +322,7 @@ class RobotCameraWrapper:
         seg_img = obs[f'{view}_segmentation_robot_only']
         # count the number of robot pixels
         num_robot_pixels = np.sum(seg_img)
-        if num_robot_pixels <= 500:
+        if num_robot_pixels <= 700:
             print(num_robot_pixels, " robot pixels in the image")
             return None, None
         
@@ -410,15 +410,17 @@ class SourceEnvWrapper:
             camera_reference_quaternion = T.mat2quat(camera_reference_orientation)
             camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))            
             fov_range = (robot_dataset_info["camera_fov"] - 15, robot_dataset_info["camera_fov"] + 15)
-            
+        else:
+            camera_reference_pose = None    
         
         for pose_index in range(start_id, min(start_id+1000, num_robot_poses)):
-            if pose_index % 30 == 0 and reference_joint_angles_path is not None: # to avoid simulation becoming unstable
+            if pose_index % 30 == 0: # to avoid simulation becoming unstable
                 self.source_env.env.reset()
             
             print(pose_index)
             counter = 0
             os.makedirs(os.path.join(save_paired_images_folder_path, f"panda_rgb", str(pose_index)), exist_ok=True)
+            os.makedirs(os.path.join(save_paired_images_folder_path, f"panda_rgb_brightness_augmented", str(pose_index)), exist_ok=True)
             os.makedirs(os.path.join(save_paired_images_folder_path, f"panda_mask", str(pose_index)), exist_ok=True)
             
             # sample robot eef pose
@@ -513,7 +515,7 @@ class SourceEnvWrapper:
                     # print("Desired camera pose: ", pos+target_pose[:3], quat)
                     # print("Actual camera pose: ", camera_pose)
                     # sample an fov
-                    fov = np.random.uniform(30, 60)
+                    fov = np.random.uniform(40, 70)
                 self.source_env.camera_wrapper.set_camera_fov(fov=fov)
                 self.source_env.update_camera()
                 
@@ -546,11 +548,13 @@ class SourceEnvWrapper:
                 if not success:
                     continue
                 
-                # sample a random integer between -50 and 50
-                source_robot_img = change_brightness(source_robot_img, value=np.random.randint(-40, 40), mask=source_robot_seg_img)
+                # sample a random integer between -40 and 40
+                source_robot_img_brightness_augmented = change_brightness(source_robot_img, value=np.random.randint(-40, 40), mask=source_robot_seg_img)
                 source_robot_img = cv2.resize(source_robot_img, (256, 256), interpolation=cv2.INTER_LINEAR)
+                source_robot_img_brightness_augmented = cv2.resize(source_robot_img_brightness_augmented, (256, 256), interpolation=cv2.INTER_LINEAR)
                 source_robot_seg_img = cv2.resize(source_robot_seg_img, (256, 256), interpolation=cv2.INTER_NEAREST)
                 cv2.imwrite(os.path.join(save_paired_images_folder_path, f"panda_rgb", f"{pose_index}/{counter}.jpg"), cv2.cvtColor(source_robot_img, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"panda_rgb_brightness_augmented", f"{pose_index}/{counter}.jpg"), cv2.cvtColor(source_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
                 cv2.imwrite(os.path.join(save_paired_images_folder_path, f"panda_mask", f"{pose_index}/{counter}.jpg"), source_robot_seg_img * 255)
                 counter += 1
 
@@ -596,6 +600,7 @@ if __name__ == "__main__":
     # Save the captured images
     save_paired_images_folder_path = args.save_paired_images_folder_path
     os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb"), exist_ok=True)
+    os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb_brightness_augmented"), exist_ok=True)
     os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_mask"), exist_ok=True)
     
     
