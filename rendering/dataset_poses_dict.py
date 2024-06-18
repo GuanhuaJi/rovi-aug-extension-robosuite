@@ -58,8 +58,8 @@ ROBOT_CAMERA_POSES_DICT = {
         "camera_widths": 320,
     },
     "jaco_play": {
-        "robot_joint_angles_path": "/home/lawrence/xembody_followup/furniture_bench_dataset/joint_states.txt",
-        "robot_ee_states_path": "/home/lawrence/xembody_followup/furniture_bench_dataset/ee_poses.txt",
+        "robot_joint_angles_path": "/home/lawrence/xembody_followup/viola_dataset/joint_states.txt",
+        "robot_ee_states_path": "/home/lawrence/xembody_followup/viola_dataset/ee_states.txt",
         "camera_position": np.array([0.9,0.,0.25]),
         "camera_orientation": np.array([[0.0000000,  0.5, -0.6],
                                     [1.0000000,  0.0000000,  0.0000000],
@@ -102,12 +102,12 @@ ROBOT_CAMERA_POSES_DICT = {
         "camera_widths": 256,
     },
     "roboturk": {
-        "robot_joint_angles_path": "/home/lawrence/xembody_followup/furniture_bench_dataset/joint_states.txt",
-        "robot_ee_states_path": "/home/lawrence/xembody_followup/furniture_bench_dataset/ee_poses.txt",
+        "robot_joint_angles_path": "/home/lawrence/xembody_followup/roboturk/joint_states.txt", # Sawyer joint angles
+        "robot_ee_states_path": "/home/lawrence/xembody_followup/roboturk/ee_states.txt",
         "camera_position": np.array([0.95,0.,0.1]),
-        "camera_orientation": np.array([[0.0000000,  0.4, -0.8],
+        "camera_orientation": np.array([[0.0000000,  0.6, -0.8],
                                     [1.0000000,  0.0000000,  0.0000000],
-                                    [0.0000000, -0.8, -0.4]]),
+                                    [0.0000000, -0.8, -0.6]]),
         "camera_fov": 60,
         "camera_heights": 240,
         "camera_widths": 320,

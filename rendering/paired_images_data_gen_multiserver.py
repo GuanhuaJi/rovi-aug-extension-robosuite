@@ -253,6 +253,10 @@ class RobotCameraWrapper:
             self.default_joint_angles = [9.44962915e-03,  2.04028892e-01,  2.27688289e-02, -2.64987059e+00, 1.89505922e-03,  2.91240765e+00,  7.87470020e-01]
         elif robotname == "UR5e":
             self.default_joint_angles = [-0.46205679, -1.76595556, 2.47328085, -2.24068841, -1.59642081, -1.99376873]
+        elif robotname == "Sawyer":
+            self.default_joint_angles = [-0.02366884, -1.19710107, -0.02385198, 2.18294157, 0.01508528, 0.55936629, -1.58903075]
+        elif robotname == "Jaco":
+            self.default_joint_angles = [3.18165494, 3.64849233, 0.02417776, 1.16953827, 0.05959387, 3.74331165, 3.13904329]
     
     
     def compute_eef_pose(self):
@@ -260,7 +264,7 @@ class RobotCameraWrapper:
         rot = np.array(T.mat2quat(self.env.sim.data.site_xmat[self.env.sim.model.site_name2id(self.env.robots[0].controller.eef_name)].reshape([3, 3])))
         return np.concatenate((pos, rot))
 
-    def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.003, num_iter_max=100):
+    def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.02, num_iter_max=100):
         # breakpoint()
         # reset robot joint positions so the robot is hopefully not in a weird pose
         self.set_robot_joint_positions()
@@ -340,23 +344,27 @@ class RobotCameraWrapper:
 
 
 class SourceEnvWrapper:
-    def __init__(self, source_name, source_gripper, camera_height=256, camera_width=256, connection=None, port=50007):
+    def __init__(self, source_name, source_gripper, camera_height=256, camera_width=256, connection=None, connection_num=1, port=50007):
         self.source_env = RobotCameraWrapper(robotname=source_name, grippername=source_gripper, camera_height=camera_height, camera_width=camera_width)
         self.source_name = source_name
+        self.connection_num = connection_num
         if connection:
             HOST = 'localhost'
             PORT = port
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.s.bind((HOST, PORT))
-            self.s.listen(1)
-            self.conn, addr = self.s.accept()
+            self.s.listen(self.connection_num)
+            self.conns = []
+            for _ in range(self.connection_num):
+                conn, addr = self.s.accept()
+                self.conns.append(conn)
             print('Connected by', addr)
         else:
             self.s = None
-            self.conn = None
+            self.conns = []
     
-    def _receive_all_bytes(self, num_bytes: int) -> bytes:
+    def _receive_all_bytes(self, conn, num_bytes: int) -> bytes:
         """
         Receives all the bytes.
         :param num_bytes: The number of bytes.
@@ -365,13 +373,13 @@ class SourceEnvWrapper:
         data = bytearray(num_bytes)
         pos = 0
         while pos < num_bytes:
-            cr = self.conn.recv_into(memoryview(data)[pos:])
+            cr = conn.recv_into(memoryview(data)[pos:])
             if cr == 0:
                 raise EOFError
             pos += cr
         return data
 
-    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, robot_dataset=None, start_id=0):
+    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, robot_dataset=None, use_cam_pose_only=False, start_id=0):
         # read desired joint angles
         if reference_ee_states_path is not None:
             ee_states = np.loadtxt(reference_ee_states_path)
@@ -415,46 +423,52 @@ class SourceEnvWrapper:
         else:
             camera_reference_pose = None    
         
-        for pose_index in range(start_id, min(start_id+1000, num_robot_poses)):
+        for pose_index in range(start_id, min(start_id+3000, num_robot_poses)):
             if pose_index % 30 == 0: # to avoid simulation becoming unstable
                 self.source_env.env.reset()
             
             print(pose_index)
             counter = 0
-            os.makedirs(os.path.join(save_paired_images_folder_path, f"panda_rgb", str(pose_index)), exist_ok=True)
-            os.makedirs(os.path.join(save_paired_images_folder_path, f"panda_rgb_brightness_augmented", str(pose_index)), exist_ok=True)
-            os.makedirs(os.path.join(save_paired_images_folder_path, f"panda_mask", str(pose_index)), exist_ok=True)
+            os.makedirs(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb", str(pose_index)), exist_ok=True)
+            os.makedirs(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb_brightness_augmented", str(pose_index)), exist_ok=True)
+            os.makedirs(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_mask", str(pose_index)), exist_ok=True)
             
             # sample robot eef pose
             both_reached = False
+            num_trial = 0
             while not both_reached:
+                if num_trial >= 10 and (reference_joint_angles_path is not None or reference_ee_states_path is not None):
+                    break
+                target_env_robot_state = Data()
                 # sample gripper opening/closing with 35% probability of closing
-                gripper_open = np.random.choice([True, False], p=[0.65, 0.35])
-                if reference_ee_states_path is not None and reference_joint_angles_path is None:
+                gripper_open = np.random.choice([True, False], p=[0.7, 0.3])
+                if reference_ee_states_path is not None and reference_joint_angles_path is None and not use_cam_pose_only:
                     ee_state = ee_states[pose_index]
                     target_pos, target_quat = T.mat2pose(ee_state.reshape((4, 4)))
                     target_quat = T.quat_multiply(target_quat, np.array([ 0, 0, -0.7071068, 0.7071068 ]))
                     target_pose = np.concatenate((target_pos, target_quat))
                     source_reached, source_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=target_pose)
                     target_pose = source_reached_pose # to avoid source not reaching its target pose
-                elif reference_joint_angles_path is not None:
+                elif reference_joint_angles_path is not None and not use_cam_pose_only:
                     joint_angle = joint_angles[pose_index]
                     # add noise to joint angles
                     joint_angle += np.random.normal(0, 0.05, 7)
-                    joint_angle[-1] += np.random.normal(0, 0.5)
+                    joint_angle[-1] += np.random.normal(0, 0.3)
                     self.source_env.set_robot_joint_positions(joint_angle)
                     source_reached_pose = self.source_env.compute_eef_pose()
                     source_reached, source_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=source_reached_pose)
                     target_pose = source_reached_pose
                 else: # both are None
                     target_pose = sample_robot_ee_pose()
-                    source_reached, source_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=target_pose)
+                    source_reached, source_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=target_pose, tracking_error_threshold=0.04) # no need to track so accurately for the source robot
+                    target_pose = source_reached_pose
                 if not source_reached:
                     if reference_joint_angles_path is not None:
                         print("Source robot failed to reach the desired pose")
                         # ideal: jump out of the while loop and directly go to the next pose
                         # the issue is the index on the target robot side will be messed up.
                     else:
+                        num_trial += 1
                         continue
                 # gripper action
                 self.source_env.open_close_gripper(gripper_open=gripper_open)
@@ -467,34 +481,57 @@ class SourceEnvWrapper:
                 # Pickle the object and send it to the server
                 data_string = pickle.dumps(variable)
                 message_length = struct.pack("!I", len(data_string))
-                self.conn.send(message_length)
-                self.conn.send(data_string)
+                for conn in self.conns:
+                    conn.send(message_length)
+                    conn.send(data_string)
                 
                 ########### Receive message from target robot ############
-                pickled_message_size = self._receive_all_bytes(4)
-                message_size = struct.unpack("!I", pickled_message_size)[0]
-                data = self._receive_all_bytes(message_size)
-                target_env_robot_state = pickle.loads(data)
-                assert target_env_robot_state.message == "Target robot tries the target pose", "Wrong synchronization"
+                target_env_robot_state_all = []
+                for j, conn in enumerate(self.conns):
+                    pickled_message_size = self._receive_all_bytes(conn, 4)
+                    message_size = struct.unpack("!I", pickled_message_size)[0]
+                    data = self._receive_all_bytes(conn, message_size)
+                    target_env_robot_state = pickle.loads(data)
+                    target_env_robot_state_all.append(target_env_robot_state)
+                    assert target_env_robot_state.message == "Target robot tries the target pose", "Wrong synchronization"
                 
-                # ########### Send message to target robot ############
-                # variable = Data()
-                # variable.robot_pose = target_pose
-                # variable.success = target_env_robot_state.success
-                # variable.message = "Robot pose success result"
-                # # Pickle the object and send it to the server
-                # data_string = pickle.dumps(variable)
-                # message_length = struct.pack("!I", len(data_string))
-                # self.conn.send(message_length)
-                # self.conn.send(data_string)
-                
-                if not target_env_robot_state.success:
+                # check if all robots are successful
+                all_success = all([target_env_robot_state.success for target_env_robot_state in target_env_robot_state_all])
+                if not all_success:
                     if reference_joint_angles_path is not None:
-                        print("Target robot failed to reach the desired pose")
+                        print(robot_dataset, "Target robot failed to reach the desired pose")
+                    
+                    ########### Send message to target robot ############
+                    variable = Data()
+                    variable.success = False
+                    variable.message = "Communicating results on whether all robots reach the same pose"
+                    # Pickle the object and send it to the server
+                    data_string = pickle.dumps(variable)
+                    message_length = struct.pack("!I", len(data_string))
+                    for conn in self.conns:
+                        conn.send(message_length)
+                        conn.send(data_string)
+                    
+                    num_trial += 1
                     continue          
                 else:
                     both_reached = True
+                    
+                    ########### Send message to target robot ############
+                    variable = Data()
+                    variable.success = True
+                    variable.message = "Communicating results on whether all robots reach the same pose"
+                    # Pickle the object and send it to the server
+                    data_string = pickle.dumps(variable)
+                    message_length = struct.pack("!I", len(data_string))
+                    for conn in self.conns:
+                        conn.send(message_length)
+                        conn.send(data_string)
                     # print("Source robot pose: ", source_reached_pose)
+            
+            # if the target robot fails to reach the source robot pose in 1 trial, skip this pose
+            if num_trial >= 1 and (reference_joint_angles_path is not None or reference_ee_states_path is not None):
+                continue
             
             if camera_reference_pose is not None:
                 ref_cam_position, ref_cam_quaternion = camera_reference_pose[:3], camera_reference_pose[3:]
@@ -533,31 +570,33 @@ class SourceEnvWrapper:
                 # Pickle the object and send it to the server
                 data_string = pickle.dumps(variable)
                 message_length = struct.pack("!I", len(data_string))
-                self.conn.send(message_length)
-                self.conn.send(data_string)
+                for conn in self.conns:
+                    conn.send(message_length)
+                    conn.send(data_string)
                 
                 if source_robot_img is None:
                     print("No robot pixels in the image")
                     continue
                 
                 ########### Receive message from target robot ############
-                pickled_message_size = self._receive_all_bytes(4)
-                message_size = struct.unpack("!I", pickled_message_size)[0]
-                data = self._receive_all_bytes(message_size)
-                target_env_robot_state = pickle.loads(data)
-                assert target_env_robot_state.message == "Target robot has captured an image", "Wrong synchronization"
-                success = target_env_robot_state.success
-                if not success:
-                    continue
+                for j, conn in enumerate(self.conns):
+                    pickled_message_size = self._receive_all_bytes(conn, 4)
+                    message_size = struct.unpack("!I", pickled_message_size)[0]
+                    data = self._receive_all_bytes(conn, message_size)
+                    target_env_robot_state = pickle.loads(data)
+                    assert target_env_robot_state.message == "Target robot has captured an image", "Wrong synchronization"
+                    success = target_env_robot_state.success
+                    if not success:
+                        continue
                 
                 # sample a random integer between -40 and 40
                 source_robot_img_brightness_augmented = change_brightness(source_robot_img, value=np.random.randint(-40, 40), mask=source_robot_seg_img)
                 source_robot_img = cv2.resize(source_robot_img, (256, 256), interpolation=cv2.INTER_LINEAR)
                 source_robot_img_brightness_augmented = cv2.resize(source_robot_img_brightness_augmented, (256, 256), interpolation=cv2.INTER_LINEAR)
                 source_robot_seg_img = cv2.resize(source_robot_seg_img, (256, 256), interpolation=cv2.INTER_NEAREST)
-                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"panda_rgb", f"{pose_index}/{counter}.jpg"), cv2.cvtColor(source_robot_img, cv2.COLOR_RGB2BGR))
-                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"panda_rgb_brightness_augmented", f"{pose_index}/{counter}.jpg"), cv2.cvtColor(source_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
-                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"panda_mask", f"{pose_index}/{counter}.jpg"), source_robot_seg_img * 255)
+                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb", f"{pose_index}/{counter}.jpg"), cv2.cvtColor(source_robot_img, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb_brightness_augmented", f"{pose_index}/{counter}.jpg"), cv2.cvtColor(source_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_mask", f"{pose_index}/{counter}.jpg"), source_robot_seg_img * 255)
                 counter += 1
 
         
@@ -583,20 +622,23 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--connection", action='store_true', help="if True, the source robot will wait for the target robot to connect to it")
+    parser.add_argument("--connection_num", type=int, default=1, help="(optional) number of target robots")
     parser.add_argument("--port", type=int, default=50007, help="(optional) port for socket connection")
     parser.add_argument("--seed", type=int, default=0, help="(optional) set seed")
+    parser.add_argument("--source_robot", type=str, default="Panda", help="Panda or UR5e or Jaco or Sawyer")
     parser.add_argument("--source_gripper", type=str, default="PandaGripper", help="PandaGripper or Robotiq85Gripper")
     parser.add_argument("--num_robot_poses", type=int, default=5, help="(optional) number of robot poses to sample")
     parser.add_argument("--num_cam_poses_per_robot_pose", type=int, default=5, help="(optional) number of camera poses per robot pose to sample")
     parser.add_argument("--save_paired_images_folder_path", type=str, default="paired_images", help="(optional) folder path to save the paired images")
     parser.add_argument("--robot_dataset", type=str, help="(optional) to match the robot poses from a dataset, provide the dataset name")
+    parser.add_argument("--use_cam_pose_only", action='store_true', help="if True, only use the camera poses from the reference dataset and not the robot poses")
     parser.add_argument("--reference_joint_angles_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the joint angles file (np.savetxt)")
     parser.add_argument("--reference_ee_states_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the ee state file (np.savetxt)")
     parser.add_argument("--start_id", type=int, default=0, help="(optional) starting index of the robot poses")
     args = parser.parse_args()
     
     
-    source_name = "Panda"
+    source_name = args.source_robot
     source_gripper = args.source_gripper
 
     # Save the captured images
@@ -615,8 +657,8 @@ if __name__ == "__main__":
         camera_height = 256
         camera_width = 256
     
-    source_env = SourceEnvWrapper(source_name, source_gripper, camera_height, camera_width, connection=args.connection, port=args.port)
-    source_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, reference_ee_states_path=args.reference_ee_states_path, robot_dataset=args.robot_dataset, start_id=args.start_id)
+    source_env = SourceEnvWrapper(source_name, source_gripper, camera_height, camera_width, connection=args.connection, connection_num=args.connection_num, port=args.port)
+    source_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, reference_ee_states_path=args.reference_ee_states_path, robot_dataset=args.robot_dataset, use_cam_pose_only=args.use_cam_pose_only, start_id=args.start_id)
 
     source_env.source_env.env.close_renderer()
     

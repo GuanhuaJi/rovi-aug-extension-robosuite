@@ -234,7 +234,7 @@ if __name__ == "__main__":
     renderer = args.renderer
 
     options["env_name"] = "Empty"  # You can choose your desired environment here
-    options["robots"] = "Panda"   # You can choose your desired robot here
+    options["robots"] = "Sawyer"   # You can choose your desired robot here
     
     # Choose controller
     controller_name = "OSC_POSE"
@@ -265,25 +265,26 @@ if __name__ == "__main__":
     
     # read desired joint angles
     # no roboturk joint angles
-    joint_angles = np.loadtxt("/home/lawrence/xembody_followup/furniture_bench_dataset/joint_states.txt")
-    ee_poses = np.loadtxt("/home/lawrence/xembody_followup/furniture_bench_dataset/ee_poses.txt")
-
+    # joint_angles = np.loadtxt("/home/lawrence/xembody_followup/furniture_bench_dataset/joint_states.txt")
+    # ee_poses = np.loadtxt("/home/lawrence/xembody_followup/furniture_bench_dataset/ee_poses.txt")
+    joint_angles = np.loadtxt("/home/lawrence/xembody_followup/roboturk/joint_states.txt")
+    ee_poses = np.loadtxt("/home/lawrence/xembody_followup/roboturk/ee_states.txt")
     # for each robot pose
     for k in range(len(joint_angles)):
         env.reset()
 
         # open gripper
-        drive_robot_to_target_pose(env, target_pose=np.array([-0.14389519,  0.03168717,  1.17985529,  0.70166397,  0.71244454,  0.00424196,  0.00851454]))
+        # drive_robot_to_target_pose(env, target_pose=np.array([-0.14389519,  0.03168717,  1.17985529,  0.70166397,  0.71244454,  0.00424196,  0.00851454]))
         
-        camera_wrapper.set_camera_fov(fov=60)
+        camera_wrapper.set_camera_fov(fov=65)
         camera_pos, camera_quat = camera_wrapper.get_camera_pose_world_frame()
         camera_rot = T.quat2mat(camera_quat)
         print("Camera pose: ", camera_pos, camera_rot)
         # breakpoint()
-        camera_pos_mirage = np.array([0.95,0.,0.1])
-        camera_rot_mirage = np.array([[0.0000000,  0.4, -0.8],
+        camera_pos_mirage = np.array([0.85,0.,0.06])
+        camera_rot_mirage = np.array([[0.0000000,  0.6, -0.8],
                                     [1.0000000,  0.0000000,  0.0000000],
-                                    [0.0000000, -0.8, -0.4]])
+                                    [0.0000000, -0.8, -0.6]])
         # robosuite camera is not right, down, forward but right, up, backward
         camera_rot_mirage[:, 1] = -camera_rot_mirage[:, 1]
         camera_rot_mirage[:, 2] = -camera_rot_mirage[:, 2]
@@ -301,8 +302,8 @@ if __name__ == "__main__":
         target_quat = target_pose[3:]#T.mat2quat(T.euler2mat(target_pose[3:]))
         # target_pos, target_quat = T.mat2pose(target_pose)
         # target_quat = T.quat_multiply(target_quat, np.array([ 0, 0, -0.7071068, 0.7071068 ]))
-        joint_angle = joint_angles[k]+ np.random.normal(0, 0.1, 7)
-        joint_angle[-1] += np.random.normal(0, 1)
+        joint_angle = joint_angles[k]#+ np.random.normal(0, 0.1, 7)
+        # joint_angle[-1] += np.random.normal(0, 1)
         reached = set_robot_joint_positions(env, joint_angles=joint_angle)
         ee_pose = compute_eef_pose(env)
         env.robots[0].controller.use_delta = True # change to delta pose
