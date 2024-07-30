@@ -339,7 +339,7 @@ class RobotCameraWrapper:
             rgb_img = rgb_img.astype(np.uint8) # Convert the resulting image to uint8 type
         else:
             # only retain the robot part in the rgb_img, set other pixels to black
-            rgb_img = (rgb_img * seg_img).astype(np.uint8)
+            rgb_img = (rgb_img_raw * seg_img).astype(np.uint8)
         return rgb_img, seg_img
 
 
