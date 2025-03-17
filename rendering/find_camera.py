@@ -14,40 +14,101 @@ import xml.etree.ElementTree as ET
 import robosuite.macros as macros
 macros.IMAGE_CONVENTION = "opencv"
 from scipy.spatial.transform import Rotation as R
+from PIL import Image
+
 
 np.set_printoptions(suppress=True, precision=6)
 
+CAMERA_HISTORY_FILE = "camera_pose_history.txt"
+
+def load_camera_pose_history(filename=CAMERA_HISTORY_FILE):
+    """
+    从文本文件里读取所有历史相机姿态 (x, y, z, roll, pitch, yaw, fov)。
+    返回一个列表，每个元素都是 [x, y, z, roll, pitch, yaw, fov]。
+    如果文件不存在则返回空列表。
+    """
+    if not os.path.exists(filename):
+        return []
+
+    poses = []
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            arr = line.split(',')
+            if len(arr) != 7:
+                continue
+            float_arr = list(map(float, arr))
+            poses.append(float_arr)
+    return poses
+
+def append_camera_pose_to_history(x, y, z, roll, pitch, yaw, fov, filename=CAMERA_HISTORY_FILE):
+    """
+    将当前相机姿态以逗号分隔的形式写到文件末尾。
+    """
+    with open(filename, 'a') as f:
+        line = f"{x},{y},{z},{roll},{pitch},{yaw},{fov}\n"
+        f.write(line)
+
+
+def matrix_to_xyz_quat(T):
+    # 1) 提取平移 (x,y,z)
+    x = T[0, 3]
+    y = T[1, 3]
+    z = T[2, 3]
+
+    # 2) 提取旋转矩阵 R_mat
+    R_mat = T[:3, :3]
+
+    # 3) 转成四元数
+    rot = R.from_matrix(R_mat)
+    # SciPy 默认返回 [x, y, z, w] (即最后一个是实部)
+    qx, qy, qz, qw = rot.as_quat()
+
+    return np.array([x, y, z]), np.array([qw, qx, qy, qz])
+
+
+def get_current_joint_positions(env, robot_index=0):
+    """
+    从仿真数据中读取 env.robots[robot_index] 对应的所有关节位置 (qpos) 并返回为 np.array
+    """
+    joint_names = env.robots[robot_index].robot_joints  # 拿到该机器人包含的所有关节名称
+    joint_positions = []
+
+    for name in joint_names:
+        jpos_addr = env.sim.model.get_joint_qpos_addr(name)
+        jpos = env.sim.data.qpos[jpos_addr]
+        joint_positions.append(jpos)
+
+    return np.array(joint_positions)
+
 def gripper_convert(gripper_state_value, robot_type):
+    if robot_type == "hydra":
+        return gripper_state_value == 0
+    if robot_type == "maskvit":
+        return gripper_state_value > 0
+    if robot_type == "kuka":
+        return gripper_state_value > 0
     if robot_type == "autolab_ur5":
         return gripper_state_value == 0
-    elif robot_type == "furniture_bench":
-        return gripper_state_value > 0.05
-    elif robot_type == "viola":
-        return gripper_state_value > 0.02
-    elif robot_type == "austin_sailor":
-        return gripper_state_value > 0.05
-    elif robot_type == "austin_mutex":
-        return gripper_state_value > 0.05
-    elif robot_type == "austin_buds":
-        return gripper_state_value > 0.05
-    return None
 
 def image_to_pointcloud(env, depth_map, camera_name, camera_height, camera_width, segmask=None):
     """
     Convert depth image to point cloud
     """
     real_depth_map = camera_utils.get_real_depth_map(env.sim, depth_map)
-    # Camera transform matrix to project from camera coordinates to world coordinates.
     extrinsic_matrix = camera_utils.get_camera_extrinsic_matrix(env.sim, camera_name=camera_name)
     intrinsic_matrix = camera_utils.get_camera_intrinsic_matrix(env.sim, camera_name=camera_name, camera_height=camera_height, camera_width=camera_width)
 
-    # Convert depth image to point cloud
-    points = [] # 3D points in robot frame of shape […, 3]
+    points = []
     for x in range(camera_width):
         for y in range(camera_height):
             if segmask is not None and segmask[y, x] == 0:
                 continue
-            coord_cam_frame = np.array([(x-intrinsic_matrix[0, -1])/intrinsic_matrix[0, 0], (y-intrinsic_matrix[1, -1])/intrinsic_matrix[1, 1], 1]) * real_depth_map[y, x]
+            coord_cam_frame = np.array([(x-intrinsic_matrix[0, -1])/intrinsic_matrix[0, 0],
+                                        (y-intrinsic_matrix[1, -1])/intrinsic_matrix[1, 1], 1]) * real_depth_map[y, x]
             coord_world_frame = np.dot(extrinsic_matrix, np.concatenate((coord_cam_frame, [1])))
             points.append(coord_world_frame)
 
@@ -57,123 +118,82 @@ def image_to_pointcloud(env, depth_map, camera_name, camera_height, camera_width
 def sample_half_hemisphere(num_samples):
     radius = np.random.normal(0.85, 0.2, num_samples)
     hemisphere_center = np.array([-0.31558805, -0.04495631,  1.271939112])
-    theta = np.random.uniform(np.pi/4, np.pi/2.2, num_samples)  # Angle with respect to the z-axis
-    phi = np.random.uniform(-np.pi*3.7/4, np.pi*3.7/4, num_samples)  # Azimuthal angle
+    theta = np.random.uniform(np.pi/4, np.pi/2.2, num_samples)
+    phi = np.random.uniform(-np.pi*3.7/4, np.pi*3.7/4, num_samples)
     positions = np.zeros((num_samples, 3))
-    positions[:, 0] = radius * np.sin(theta) * np.cos(phi)  # x-coordinate
-    positions[:, 1] = radius * np.sin(theta) * np.sin(phi)  # y-coordinate
-    positions[:, 2] = radius * np.cos(theta)  # z-coordinate
+    positions[:, 0] = radius * np.sin(theta) * np.cos(phi)
+    positions[:, 1] = radius * np.sin(theta) * np.sin(phi)
+    positions[:, 2] = radius * np.cos(theta)
 
-    # Calculate orientations (quaternions)
     backward_directions = positions - hemisphere_center
     backward_directions /= np.linalg.norm(backward_directions, axis=1, keepdims=True)
-    right_directions = np.cross(np.tile(np.array([0, 0, 1]), (num_samples, 1)), backward_directions)  # Assuming right direction is along the x-axis
+    right_directions = np.cross(np.tile(np.array([0, 0, 1]), (num_samples, 1)), backward_directions)
     right_directions /= np.linalg.norm(right_directions, axis=1, keepdims=True)
     up_directions = np.cross(backward_directions, right_directions)
     up_directions /= np.linalg.norm(up_directions, axis=1, keepdims=True)
 
-    rotations = np.array([np.column_stack((right, down, forward)) for right, down, forward in zip(right_directions, up_directions, backward_directions)])
-    # rotations = np.array([                                                        [[ 0.   ,       0.70614784, -0.70806442     ],
-    #                                                         [ 1.    ,      0.      ,    0.                ],
-    #                                                         [ 0.     ,    -0.70806442 ,-0.70614784     ]]])
-
-    # Convert rotation matrices to quaternions
+    rotations = np.array([np.column_stack((right, down, forward)) 
+                          for right, down, forward in zip(right_directions, up_directions, backward_directions)])
     quaternions = []
     for rotation_matrix in rotations:
         rotation = Rotation.from_matrix(rotation_matrix)
         quaternion = rotation.as_quat()
         quaternions.append(quaternion)
-
     quaternions = np.array(quaternions)
-
-
     return positions, quaternions
 
 def sample_robot_ee_pose():
-    # the position should be in the follow range:
-    # x: -0.3 ~ 0.3
-    # y: -0.3 ~ 0.3
-    # z: 0.5 ~ 1.5
-    # np.random.seed(0)
     pos = np.random.uniform(-0.25, 0.25, 3)
     pos[2] = np.random.uniform(0.6, 1.3)
-    # quat = np.random.uniform(-1, 1, 4)
-    # quat /= np.linalg.norm(quat)
     
     def sample_rotation_matrix():
-        # Sample theta (zenith angle) from a normal distribution centered around pi
         theta = np.random.normal(loc=np.pi, scale=np.pi/3.5)
-        # print("theta: ", theta)
-        # Sample phi (azimuthal angle) uniformly between 0 and 2*pi
         phi = np.random.uniform(0, 2*np.pi)
-        
-        # Convert spherical coordinates to Cartesian coordinates
         z_axis = np.array([np.sin(theta) * np.cos(phi),
-                        np.sin(theta) * np.sin(phi),
-                        np.cos(theta)])
-        
-        # Sample a random vector for the rightward direction (perpendicular to z-axis)
+                           np.sin(theta) * np.sin(phi),
+                           np.cos(theta)])
         rightward = np.random.uniform(-1, 1, size=3)
         rightward -= np.dot(rightward, z_axis) * z_axis
         rightward /= np.linalg.norm(rightward)
-        
-        # Compute the inward direction (perpendicular to both z and rightward axes)
         inward = np.cross(rightward, z_axis)
-        
-        # Construct the rotation matrix
-        R = np.column_stack((inward, rightward, z_axis))
-    
-        return R
+        R_mat = np.column_stack((inward, rightward, z_axis))
+        return R_mat
 
     quat = T.mat2quat(sample_rotation_matrix())
     return np.concatenate((pos, quat))
 
 
 def compute_pose_error(current_pose, target_pose):
-    # quarternions are equivalent up to sign
-    error = min(np.linalg.norm(current_pose - target_pose), np.linalg.norm(current_pose - np.concatenate((target_pose[:3], -target_pose[3:]))))
+    error = min(np.linalg.norm(current_pose - target_pose),
+                np.linalg.norm(current_pose - np.concatenate((target_pose[:3], -target_pose[3:]))))
     return error
-'''
 
+'''
 def compute_pose_error(
-    current_pose,   # [px, py, pz, qw, qx, qy, qz]
-    target_pose,    # [px, py, pz, qw, qx, qy, qz]
+    current_pose,   
+    target_pose,    
     position_weight=1.0,
     orientation_weight=1.0
 ):
     current_pos = current_pose[:3]
-    current_quat = current_pose[3:]  # [w, x, y, z]
-
+    current_quat = current_pose[3:]
     target_pos = target_pose[:3]
-    target_quat = target_pose[3:]   # [w, x, y, z]
-
-    # 2) 计算位置误差 (Euclidean distance)
+    target_quat = target_pose[3:]
     pos_error = np.linalg.norm(current_pos - target_pos)
-
-    # 3) 计算姿态误差 (基于四元数夹角)
-    #    四元数 q1, q2 的旋转差可由内积 dot(q1, q2) 推出：
-    #    旋转角度差 Δθ = 2 * arccos(|q1 dot q2|)
-    dot_val = abs(np.dot(current_quat, target_quat))  # dot product
-    # 数值稳定：可能浮点运算让 dot_val 稍超 1.0，需要夹紧到 [0,1]
+    dot_val = abs(np.dot(current_quat, target_quat))
     dot_val = np.clip(dot_val, 0.0, 1.0)
     ori_error = 2.0 * np.arccos(dot_val)
-
-    # 4) 合并误差 (可自定义加权策略)
     total_error = position_weight * pos_error + orientation_weight * ori_error
-
     return total_error
 '''
             
-
 def change_brightness(img, value=30, mask=None):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     h, s, v = cv2.split(hsv)
-    
     if mask is None:
         mask = np.ones_like(v)
     else:
         mask = mask.squeeze()
-    # Apply mask to the brightness channel
     if value > 0:
         lim = 255 - value
         v[(v > lim) & (mask == 1)] = 255
@@ -182,7 +202,6 @@ def change_brightness(img, value=30, mask=None):
         lim = -value
         v[(v < lim) & (mask == 1)] = 0
         v[(v >= lim) & (mask == 1)] -= lim
-
     final_hsv = cv2.merge((h, s, v))
     img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
     return img
@@ -202,73 +221,53 @@ class Data:
 class CameraWrapper:
     def __init__(self, env, camera_name="agentview"):
         self.env = env
-        # Create the camera mover
-        self.camera_mover = CameraMover(
-            env=env,
-            camera=camera_name,
-        )
+        self.camera_mover = CameraMover(env=env, camera=camera_name)
         self.cam_tree = ET.Element("camera", attrib={"name": camera_name})
-        CAMERA_NAME = self.cam_tree.get("name") # Make sure we're using the camera that we're modifying
+        CAMERA_NAME = self.cam_tree.get("name")
         self.camera_id = env.sim.model.camera_name2id(CAMERA_NAME)
         self.env.viewer.set_camera(camera_id=self.camera_id)
         
-        
-        # Define initial file camera pose
         initial_file_camera_pos, initial_file_camera_quat = self.camera_mover.get_camera_pose()
         initial_file_camera_pose = T.make_pose(initial_file_camera_pos, T.quat2mat(initial_file_camera_quat))
-
-        # remember difference between camera pose in initial tag and absolute camera pose in world
-        # usually we just operate in the wolrd frame, so we don't need to worry about the difference
-        # but if we ever want to know the camera pose in the file frame, we can use this
         initial_world_camera_pos, initial_world_camera_quat = self.camera_mover.get_camera_pose()
         initial_world_camera_pose = T.make_pose(initial_world_camera_pos, T.quat2mat(initial_world_camera_quat))
         self.world_in_file = initial_file_camera_pose.dot(T.pose_inv(initial_world_camera_pose))
         
-    
+    def get_camera_extrinsic(self):
+        pos = self.env.sim.data.cam_xpos[self.camera_id]
+        xmat = self.env.sim.data.cam_xmat[self.camera_id]
+        R_cam2world = xmat.reshape(3,3).T
+        E_cam2world = np.eye(4)
+        E_cam2world[:3,:3] = R_cam2world
+        E_cam2world[:3, 3] = pos
+        return E_cam2world
+
     def set_camera_fov(self, fov=45.0):
         self.env.sim.model.cam_fovy[self.camera_id] = float(fov)
-        # for _ in range(50):
-        #     self.env.sim.forward()
-        #     self.env.sim.step()
-        #     self.env._update_observables()
     
     def set_camera_pose(self, pos, quat, offset=np.array([0, 0, 0])):
-        # Robot base world coord: -0.6 0.0 0.912
         self.camera_mover.set_camera_pose(pos=pos + offset, quat=quat)
         target_pose = np.concatenate((pos + offset, quat))
         current_pose = self.get_camera_pose_world_frame()
         error = compute_pose_error(current_pose, target_pose)
-        # for _ in range(50):
-        #     self.camera_mover.set_camera_pose(pos=pos + offset, quat=quat)
-        #     self.env.sim.forward()
-        #     self.env.sim.step()
-        #     self.env._update_observables()
             
     
     def get_camera_pose_world_frame(self):
         camera_pos, camera_quat = self.camera_mover.get_camera_pose()
-        # world_camera_pose = T.make_pose(camera_pos, T.quat2mat(camera_quat))
-        # print("Camera pose in the world frame:", camera_pos, camera_quat)
         return np.concatenate((camera_pos, camera_quat))
     
     def get_camera_pose_file_frame(self, world_camera_pose):
         file_camera_pose = self.world_in_file.dot(world_camera_pose)
         camera_pos, camera_quat = T.mat2pose(file_camera_pose)
         camera_quat = T.convert_quat(camera_quat, to="wxyz")
-
         print("\n\ncurrent camera tag you should copy")
         self.cam_tree.set("pos", "{} {} {}".format(camera_pos[0], camera_pos[1], camera_pos[2]))
         self.cam_tree.set("quat", "{} {} {} {}".format(camera_quat[0], camera_quat[1], camera_quat[2], camera_quat[3]))
         print(ET.tostring(self.cam_tree, encoding="utf8").decode("utf8"))
         
     def perturb_camera(self, seed=None, angle=10, scale=0.15):
-        # np.random.seed(seed)
         self.camera_mover.rotate_camera(point=None, axis=np.random.uniform(-1, 1, 3), angle=angle)
         self.camera_mover.move_camera(direction=np.random.uniform(-1, 1, 3), scale=scale)
-        # for _ in range(50):
-        #     self.env.sim.forward()
-        #     self.env.sim.step()
-        #     self.env._update_observables()
         
 
 class RobotCameraWrapper:
@@ -279,14 +278,14 @@ class RobotCameraWrapper:
             robots=robotname,
             gripper_types=grippername,
             env_name="Empty",
-            has_renderer=True,  # no on-screen renderer
-            has_offscreen_renderer=True,  # no off-screen renderer
+            has_renderer=True,
+            has_offscreen_renderer=True,
             ignore_done=True,
-            use_camera_obs=True,  # no camera observations
+            use_camera_obs=True,
             controller_configs = suite.load_controller_config(default_controller="OSC_POSE"),
             control_freq=20,
             renderer="mujoco",
-            camera_names = ["agentview"],  # You can add more camera names if needed
+            camera_names = ["agentview"],
             camera_heights = camera_height,
             camera_widths = camera_width,
             camera_depths = True,
@@ -294,7 +293,6 @@ class RobotCameraWrapper:
             hard_reset=False,
         )
         self.env.reset()
-        
         self.camera_wrapper = CameraWrapper(self.env)
         
         print(robotname)
@@ -305,47 +303,36 @@ class RobotCameraWrapper:
         elif robotname == "Sawyer":
             self.default_joint_angles = [0.2553876936435699463, -0.03010351583361625671, -0.9372422099113464355, 1.432788133621215820, 1.421311497688293457, 0.9351797103881835938, -3.228875875473022461]
         elif robotname == "Jaco":
-            #self.default_joint_angles = [0.0, -1.2, 1.5, 0.0, 0.0, 0.0, 0.5]
-            self.default_joint_angles = [ 2.53449,   3.635928, -2.308851, 4.522237, -3.533445, 4.495141, 3.385924]
+            self.default_joint_angles = [0.0, -1.2, 1.5, 0.0, 0.0, 0.0, 0.5]
         elif robotname == "IIWA":
-            #self.default_joint_angles = [-0.3895,    0.309208,  0.541432, -1.737791,  6.123849,  1.06824,   0.181003] # berkeley
-            self.default_joint_angles  = [-0.095583,  0.246849,  0.210468, -1.817155,  6.216322,  1.064266,  6.393936] # viola
+            self.default_joint_angles = [0.0, -0.6, 0.0, 1.2, 0.0, 1.0, 0.0]
         
         if robotname == "Panda":
-            self.some_safe_joint_angles = [
-                0.0,       # joint0
-                -0.785398, # joint1  (-45°)
-                0.0,       # joint2
-                -2.35619,  # joint3  (-135°)
-                0.0,       # joint4
-                1.5708,    # joint5  (90°)
-                0.785398   # joint6  (45°)
-            ]
+            self.some_safe_joint_angles = [0.0, -0.785398, 0.0, -2.35619, 0.0, 1.5708, 0.785398]
         elif robotname == "UR5e":
-            self.some_safe_joint_angles = [
-                0.0,    # base
-                0,  # shoulder
-                0,   # elbow
-                0.0,    # wrist1
-                0,   # wrist2
-                0.0     # wrist3
-            ]
+            self.some_safe_joint_angles = [-3.3, -1.207356,  2.514808, -2.433074, -1.849945,  4.024987]
         elif robotname == "Sawyer":
-            #self.some_safe_joint_angles = [0.2553876936435699463, -0.03010351583361625671, -0.9372422099113464355, 1.432788133621215820, 1.421311497688293457, 0.9351797103881835938, -3.228875875473022461]
-            #self.some_safe_joint_angles = [0.1, -1.18, 0.0, 2.18, 0.1, 1.57, 0.1]
-            self.some_safe_joint_angles = [1, 1, 1, 1, 1, 1, 1]
+            self.some_safe_joint_angles = [0.2553876936435699463, -0.03010351583361625671, -0.9372422099113464355, 1.432788133621215820, 1.421311497688293457, 0.9351797103881835938, -3.228875875473022461]
         elif robotname == "IIWA":
-            self.some_safe_joint_angles = [-0.095583,  0.246849,  0.210468, -1.817155,  6.216322,  1.064266,  6.393936] #viola
-            #self.some_safe_joint_angles = [-2.456318, -1.095596, -0.949903,  1.350226,  0.979147, -1.206409,  2.421851] # berkeley
+            self.some_safe_joint_angles = [0.0, -0.6, 0.0, 1.2, 0.0, 1.0, 0.0]
         elif robotname == "Jaco":
-            self.some_safe_joint_angles = [-3.090315, 1.409086,  1.500532, 1.821214, -4.4519,    4.718327,  1.770046]
+            self.some_safe_joint_angles = [0.0, -1.2, 1.5, 0.0, 0.0, 0.0, 0.5]
 
-        self.robot_name = robotname
-        self.robot_base_name = f"robot0_base"
+        self.robot_base_name = "robot0_base"
         self.base_body_id = self.env.sim.model.body_name2id(self.robot_base_name)
         self.base_position = self.env.sim.model.body_pos[self.base_body_id].copy()
+        self.robot_name = robotname
         
         print(f"[DEBUG] 机器人基座 '{self.robot_base_name}' 的世界坐标: {self.base_position}")
+        '''
+        intrinsic_matrix = camera_utils.get_camera_intrinsic_matrix(
+            self.env.sim,
+            camera_name="agentview",
+            camera_height=240,
+            camera_width=320
+        )
+        print("INTRINSIC MATRIX:", intrinsic_matrix)
+        '''
     
     
     def compute_eef_pose(self):
@@ -354,54 +341,31 @@ class RobotCameraWrapper:
         return np.concatenate((pos, rot))
     
     def teleport_to_joint_positions(self, joint_angles):
-        """
-        直接将机器人“瞬移”到 joint_angles 对应的关节位置，不经过任何控制器或动力学。
-        """
-        # 机器人有哪些关节名字，可通过 self.env.robots[0].robot_joints 查看
         joint_names = self.env.robots[0].robot_joints
-        
-        # 逐个关节写入 qpos / qvel
         for i, joint_name in enumerate(joint_names):
-            # 先通过 joint 名称拿到在 qpos 中的下标范围
             qpos_addr = self.env.sim.model.get_joint_qpos_addr(joint_name)
-            
-            # 将目标关节角赋值给仿真
             self.env.sim.data.qpos[qpos_addr] = joint_angles[i]
-            # 速度清零
             self.env.sim.data.qvel[qpos_addr] = 0.0
-
-        # 刷新仿真，使得修改生效
         self.env.sim.forward()
 
     def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.003, num_iter_max=100):
-        # breakpoint()
-        # reset robot joint positions so the robot is hopefully not in a weird pose
         self.set_robot_joint_positions()
-        self.env.robots[0].controller.use_delta = False # change to absolute pose for setting the initial state
-        
+        self.env.robots[0].controller.use_delta = False
         assert len(target_pose) == 7, "Target pose should be 7DOF"
         current_pose = self.compute_eef_pose()
         error = compute_pose_error(current_pose, target_pose)
         num_iters = 0   
-
         no_improve_steps = 0
-        last_error = error 
         while error > tracking_error_threshold and num_iters < num_iter_max:
             action = np.zeros(7)
             action[:3] = target_pose[:3]
             action[3:6] = T.quat2axisangle(target_pose[3:])
-
-
-            # 如果最近几步误差几乎不变，判定为“卡住”，就加一点随机扰动
             if no_improve_steps > 10:
-                #print("[DEBUG] Hard reset posture to unlock")
-                #self.set_robot_joint_positions(self.some_safe_joint_angles)
                 if self.robot_name == 'UR5e':
                     self.some_safe_joint_angles += np.random.normal(0, 0.1, (6))
                 else:
                     self.some_safe_joint_angles += np.random.normal(0, 0.1, (7))
                 self.set_robot_joint_positions()
-                # env.step() 多次
                 for _ in range(200):
                     self.env.sim.forward()
                     self.env.sim.step()
@@ -411,43 +375,22 @@ class RobotCameraWrapper:
             current_joints = self.env.sim.data.qpos[self.env.robots[0]._ref_joint_pos_indexes].copy()
             self.some_safe_joint_angles = current_joints
             new_error = compute_pose_error(current_pose, target_pose)
-
             if abs(new_error - error) < 1e-5:
                 no_improve_steps += 1
             else:
                 no_improve_steps = 0
-
             error = new_error
             num_iters += 1
 
-        '''
-        if np.linalg.norm(current_pose - target_pose) < np.linalg.norm(current_pose - np.concatenate((target_pose[:3], -target_pose[3:]))):
-            current_pose_num = [format(num, '.10f') for num in current_pose]
-            target_pose_num = [format(num, '.10f') for num in target_pose]
-            print("CURRENT POSE", current_pose_num)
-            print("TARGET  POSE", target_pose_num)
-        else:
-            target_pose_opp = np.concatenate((target_pose[:3], -target_pose[3:]))
-            current_pose_num = [format(num, '.10f') for num in current_pose]
-            target_pose_num = [format(num, '.10f') for num in target_pose_opp]
-            print("CURRENT POSE", current_pose_num)
-            print("TARGET  POSE", target_pose_num)
         print("ERROR", error)
-        '''
-        print("ERROR", error)
-        # print("Take {} iterations to drive robot to target pose".format(num_iters))
+        print("NUM_ITERS", num_iters)
         current_pose = self.compute_eef_pose()
         try:
             assert error < tracking_error_threshold, "Starting states are not the same\n"
-            
             return True, current_pose
         except:
-            '''
-            print("Starting states are not the same\n"
-                    "Source: ", current_pose,
-                    "Target: ", target_pose)
-            '''
             return False, current_pose
+
 
     def set_robot_joint_positions(self, joint_angles=None):
         if joint_angles is None:
@@ -459,7 +402,7 @@ class RobotCameraWrapper:
             self.env._update_observables()
     
     def open_close_gripper(self, gripper_open=True):
-        self.env.robots[0].controller.use_delta = True # change to delta pose
+        self.env.robots[0].controller.use_delta = True
         action = np.zeros(7)
         if not gripper_open:
             action[-1] = 1
@@ -479,19 +422,14 @@ class RobotCameraWrapper:
         obs = self.env._get_observations()
         rgb_img_raw = obs[f'{view}_image']
         seg_img = obs[f'{view}_segmentation_robot_only']
-        # count the number of robot pixels
         num_robot_pixels = np.sum(seg_img)
         if num_robot_pixels <= 700:
             print(num_robot_pixels, " robot pixels in the image")
-            #return None, None
-        
-        # Create a mask where non-robot pixels are set to 0 and robot pixels are set to 1
         if white_background:
             mask = (np.repeat(seg_img, 3, axis=2)).astype(bool)
-            rgb_img = np.where(~mask, [255, 255, 255], rgb_img_raw) # Set non-robot pixels to white
-            rgb_img = rgb_img.astype(np.uint8) # Convert the resulting image to uint8 type
+            rgb_img = np.where(~mask, [255, 255, 255], rgb_img_raw)
+            rgb_img = rgb_img.astype(np.uint8)
         else:
-            # only retain the robot part in the rgb_img, set other pixels to black
             rgb_img = (rgb_img_raw * seg_img).astype(np.uint8)
         return rgb_img, seg_img
 
@@ -503,25 +441,22 @@ class SourceEnvWrapper:
         self.fixed_cam_positions = None
         self.fixed_cam_quaternions = None
         self.verbose = verbose
-        if connection:
-            HOST = 'localhost'
-            PORT = port
-            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.s.bind((HOST, PORT))
-            self.s.listen(1)
-            self.conn, addr = self.s.accept()
-            print('Connected by', addr)
+        # 用于记录标记的状态
+        self.marked_pose = None
+
+        self.camera_pose_history = load_camera_pose_history()
+        if len(self.camera_pose_history) == 0:
+            print("[INFO] 没有历史文件或内容为空，使用初始默认相机姿态。")
+            default_pose = [1.25, -0.05, 0.34, 70.0, 0.0, 88.0, 22.0]
+            self.camera_pose_history.append(default_pose)
+            append_camera_pose_to_history(*default_pose)
         else:
-            self.s = None
-            self.conn = None
+            print(f"[INFO] 已加载历史相机姿态，共 {len(self.camera_pose_history)} 条。当前使用最后一条为初始。")
+        
+        self.current_camera_pose = self.camera_pose_history[-1]
+        self.apply_camera_pose()
     
     def _receive_all_bytes(self, num_bytes: int) -> bytes:
-        """
-        Receives all the bytes.
-        :param num_bytes: The number of bytes.
-        :return: The bytes.
-        """
         data = bytearray(num_bytes)
         pos = 0
         while pos < num_bytes:
@@ -531,13 +466,25 @@ class SourceEnvWrapper:
             pos += cr
         return data
 
+    def apply_camera_pose(self):
+        x, y, z, roll, pitch, yaw, fov = self.current_camera_pose
+        from scipy.spatial.transform import Rotation as R
+        r = R.from_euler('xyz', [roll, pitch, yaw], degrees=True)
+        quat = r.as_quat()
+        pos = np.array([x, y, z]) + np.array([-0.6, 0.0, 0.912])
+        self.source_env.camera_wrapper.set_camera_pose(pos, quat)
+        self.source_env.camera_wrapper.set_camera_fov(fov)
+        for _ in range(10):
+            self.source_env.env.sim.forward()
+            self.source_env.env.sim.step()
+            self.source_env.env._update_observables()
+
     def _load_dataset_info(self, dataset_name):
         from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
         info = ROBOT_CAMERA_POSES_DICT[dataset_name]
         return info
     
     def _load_dataset_files(self, info, dataset_name):
-        # 可能包含 joint_angles, ee_states, gripper_states
         joint_angles = None
         ee_states = None
         gripper_states = None
@@ -556,138 +503,182 @@ class SourceEnvWrapper:
         gripper_states = np.loadtxt(gripper_states_path)
         return joint_angles, ee_states, gripper_states
     
+    def _parse_user_command(self, x, y, z, roll, pitch, yaw, fov):
+        user_in = input("Modification: ")
+        stripped = user_in.strip()
+        # 如果输入 m 则标记当前状态
+        if stripped == 'm':
+            self.marked_pose = [x, y, z, roll, pitch, yaw, fov]
+            print(f"[INFO] 标记当前状态: x={x}, y={y}, z={z}, roll={roll}, pitch={pitch}, yaw={yaw}, fov={fov}")
+            return x, y, z, roll, pitch, yaw, fov
+        # 如果输入 b 则回退到上一个标记的状态
+        if stripped == 'b':
+            if self.marked_pose is not None:
+                x, y, z, roll, pitch, yaw, fov = self.marked_pose
+                print(f"[INFO] 回退到标记状态: x={x}, y={y}, z={z}, roll={roll}, pitch={pitch}, yaw={yaw}, fov={fov}")
+                append_camera_pose_to_history(x, y, z, roll, pitch, yaw, fov)
+                self.camera_pose_history.append([x, y, z, roll, pitch, yaw, fov])
+                self.current_camera_pose = [x, y, z, roll, pitch, yaw, fov]
+                return x, y, z, roll, pitch, yaw, fov
+            else:
+                print("[WARN] 未标记状态，无法回退。")
+                return x, y, z, roll, pitch, yaw, fov
+        # 如果输入纯数字则回退 n 步
+        if user_in.isdigit():
+            n = int(user_in)
+            if n <= 0:
+                print("[WARN] 回退步数应当 > 0")
+                return x, y, z, roll, pitch, yaw, fov
+            current_len = len(self.camera_pose_history)
+            if n >= current_len:
+                print(f"[WARN] 历史只有 {current_len} 条，无法回退 {n} 步，自动回到最早一条")
+                chosen = self.camera_pose_history[0]
+            else:
+                chosen = self.camera_pose_history[-(n+1)]
+            x, y, z, roll, pitch, yaw, fov = chosen
+            print(f"[INFO] 回退到 {n} 步前 => x={x}, y={y}, z={z}, roll={roll}, pitch={pitch}, yaw={yaw}, fov={fov}")
+            append_camera_pose_to_history(x, y, z, roll, pitch, yaw, fov)
+            self.camera_pose_history.append([x, y, z, roll, pitch, yaw, fov])
+            self.current_camera_pose = [x, y, z, roll, pitch, yaw, fov]
+            return x, y, z, roll, pitch, yaw, fov
+
+        if stripped == 'e':
+            print(f"当前: x={x}, y={y}, z={z}, roll={roll}, pitch={pitch}, yaw={yaw}, fov={fov}")
+            return x, y, z, roll, pitch, yaw, fov
+
+        try:
+            command, number = user_in.split()
+            number = float(number)
+            if command == 'x':
+                x = number
+            elif command == 'y':
+                y = number
+            elif command == 'z':
+                z = number
+            elif command == 'roll':
+                roll = number
+            elif command == 'pitch':
+                pitch = number
+            elif command == 'yaw':
+                yaw = number
+            elif command == 'fov':
+                fov = number
+            else:
+                print("[WARNING] Unrecognized input, ignoring.")
+        except:
+            print("[WARNING] 输入格式错误，请重新输入。")
+
+        print(f"Now => x={x}, y={y}, z={z}, roll={roll}, pitch={pitch}, yaw={yaw}, fov={fov}")
+        append_camera_pose_to_history(x, y, z, roll, pitch, yaw, fov)
+        self.camera_pose_history.append([x, y, z, roll, pitch, yaw, fov])
+        self.current_camera_pose = [x, y, z, roll, pitch, yaw, fov]
+        return x, y, z, roll, pitch, yaw, fov
+    
+
+    def _drive_robot_to_pose_if_needed(self, pose_index,
+                                       reference_joint_angles, reference_ee_states, gripper_states,
+                                       robot_dataset):
+        if reference_ee_states is not None and reference_joint_angles is None:
+            target_pose = reference_ee_states[pose_index]
+            reached, actual_pose = self.source_env.drive_robot_to_target_pose(target_pose=target_pose)
+        elif reference_joint_angles is not None:
+            joint_angle = reference_joint_angles[pose_index]
+            self.source_env.teleport_to_joint_positions(joint_angle)
+            reached, actual_pose = self.source_env.drive_robot_to_target_pose(self.source_env.compute_eef_pose())
+        else:
+            random_pose = sample_robot_ee_pose()
+            reached, actual_pose = self.source_env.drive_robot_to_target_pose(target_pose=random_pose)
+        
+        gripper_open = gripper_convert(gripper_states[pose_index], "autolab_ur5")
+        self.source_env.open_close_gripper(gripper_open=gripper_open)
+        return reached, actual_pose
+
     def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, reference_gripper_states_path=None, robot_dataset=None, start_id=0):
+        x, y, z, roll, pitch, yaw, fov = self.current_camera_pose
         info = self._load_dataset_info(robot_dataset)
         joint_angles, ee_states, gripper_states = self._load_dataset_files(info, robot_dataset)
-        num_robot_poses = joint_angles.shape[0]
-        
-        camera_reference_position = info["camera_position"] + np.array([-0.6, 0.0, 0.912])
-        roll_deg = info["roll"]
-        pitch_deg = info["pitch"]
-        yaw_deg = info["yaw"]
-        fov = info["camera_fov"]
-        r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
-        camera_reference_quaternion = r.as_quat()
-        camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))      
-        for pose_index in range(num_robot_poses):
-            '''
-            if pose_index % 30 == 0:
-                self.source_env.env.reset()'
-            '''
-            
-            print(f"[INFO] 处理第{pose_index}个pose")
+        num_frames = joint_angles.shape[0]
+        idxs = [
+            num_frames * 1 // 5,
+            num_frames * 2 // 5,
+            num_frames * 3 // 5,
+            num_frames * 4 // 5
+        ]
+        print("选取的4个帧下标:", idxs)
+
+        while True:
+            x, y, z, roll, pitch, yaw, fov = self._parse_user_command(x, y, z, roll, pitch, yaw, fov)
+            camera_reference_position = np.array([x, y, z]) + np.array([-0.6, 0.0, 0.912])
+            roll_deg = roll
+            pitch_deg = pitch
+            yaw_deg = yaw
+            r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
+            camera_reference_quaternion = r.as_quat()
+            camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))   
+            print("camera_reference_pose:", camera_reference_pose)         
             counter = 0
-            os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb", str(counter)), exist_ok=True)
-            os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb_brightness_augmented", str(counter)), exist_ok=True)
-            os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_mask", str(counter)), exist_ok=True)
+            blended_images = []
+            for idx in idxs:
+                os.makedirs(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb", str(idx)), exist_ok=True)
+                os.makedirs(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb_brightness_augmented", str(idx)), exist_ok=True)
+                os.makedirs(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_mask", str(idx)), exist_ok=True)
+                gripper_open = gripper_convert(gripper_states[idx], "autolab_ur5")
+                reached = False
+                while not reached:
+                    reached, actual_pose = self._drive_robot_to_pose_if_needed(
+                        idx,
+                        joint_angles, ee_states, gripper_states,
+                        robot_dataset
+                    )
+                    if not reached:
+                        print("Failed to reach pose", idx)
+                    else:
+                        print("Reached pose:", actual_pose)
 
-            source_reached, target_reached = False, False
-            attempt_counter = 0
-            while source_reached == False:
-                attempt_counter += 1
-                print(f"[INFO] SOURCE 第{attempt_counter}次尝试")
-                if attempt_counter > 10:
-                    break
-
-                gripper_open = gripper_convert(gripper_states[pose_index], robot_dataset)
-                for i in range(2):
-                    source_reached = False
-                    joint_angle = joint_angles[pose_index]
-                    self.source_env.teleport_to_joint_positions(joint_angle)
-                    source_reached_pose = self.source_env.compute_eef_pose()
-                    source_reached, actual_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=source_reached_pose)
-                    target_pose = actual_reached_pose
-                    if not source_reached:
-                        if reference_joint_angles_path is not None:
-                            print("Source robot failed to reach the desired pose")
-                        else:
-                            continue
-                    self.source_env.open_close_gripper(gripper_open=gripper_open)
-                    target_pose = self.source_env.compute_eef_pose()
-                    print("SOURCE_REACHED_POSE:", target_pose)
-
-            print("target need to reach:", target_pose)
-            attempt_counter = 0
-            while target_reached == False:
-                attempt_counter += 1
-                print(f"[INFO] TARGET 第{attempt_counter}次尝试")
-                if attempt_counter > 10:
-                    break
-
-                variable = Data()
-                variable.robot_pose = target_pose
-                variable.gripper_open = gripper_open
-                variable.message = "Source reached a target pose. Send target pose"
-                variable.pose_index = pose_index
-                data_string = pickle.dumps(variable)
-                message_length = struct.pack("!I", len(data_string))
-                self.conn.send(message_length)
-                self.conn.send(data_string)
-
-                pickled_message_size = self._receive_all_bytes(4)
-                message_size = struct.unpack("!I", pickled_message_size)[0]
-                data = self._receive_all_bytes(message_size)
-                target_env_robot_state = pickle.loads(data)
-                assert target_env_robot_state.message == "Target robot tries the target pose", "Wrong synchronization"
-                
-                if target_env_robot_state.success:
-                    target_reached = True
-            
-
-
-            if not source_reached or not target_reached:
-                print(f"\033[33m[WARNING] 跳过第{pose_index}个pose\033[0m")
-                continue
-
-            if camera_reference_pose is not None:
-                ref_cam_position, ref_cam_quaternion = camera_reference_pose[:3], camera_reference_pose[3:]
-                cam_positions, cam_quaternions = [ref_cam_position] * num_cam_poses_per_robot_pose, [ref_cam_quaternion] * num_cam_poses_per_robot_pose
-            for i, (pos, quat) in enumerate(zip(cam_positions, cam_quaternions)):
                 if camera_reference_pose is not None:
+                    ref_cam_position, ref_cam_quaternion = camera_reference_pose[:3], camera_reference_pose[3:]
+                    cam_positions = [ref_cam_position] * num_cam_poses_per_robot_pose
+                    cam_quaternions = [ref_cam_quaternion] * num_cam_poses_per_robot_pose
+                for i, (pos, quat) in enumerate(zip(cam_positions, cam_quaternions)):
                     self.source_env.camera_wrapper.set_camera_pose(pos=pos, quat=quat)
                     camera_pose = self.source_env.camera_wrapper.get_camera_pose_world_frame()
+                    print("camera_pose", camera_pose)
+                    self.source_env.camera_wrapper.set_camera_fov(fov=fov)
+                    self.source_env.update_camera()
+                    
+                    source_robot_img, source_robot_seg_img = self.source_env.get_observation(white_background=True)
+                    source_robot_img_brightness_augmented = change_brightness(source_robot_img, value=np.random.randint(-40, 40), mask=source_robot_seg_img)
+                    print(f"\033[32m[NOTICE] 已完成第{idx}个pose的生成\033[0m")
+                    cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb", f"{idx}/{counter}.jpg"), cv2.cvtColor(source_robot_img, cv2.COLOR_RGB2BGR))
+                    cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb_brightness_augmented", f"{idx}/{counter}.jpg"), cv2.cvtColor(source_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
+                    cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_mask", f"{idx}/{counter}.jpg"), source_robot_seg_img * 255)
+                    
+                    img2 = Image.open(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb", f"{idx}/{counter}.jpg")).convert("RGBA")
+                    img1 = Image.open(f"./states/nyu_franka_play_dataset_converted_externally_to_rlds/episode_0/images/{idx}.jpeg").convert("RGBA")
+
+                    if img1.size != img2.size:
+                        img2 = img2.resize(img1.size)
+                    blended = Image.blend(img1, img2, alpha=0.5)
+                    blended_images.append(blended.convert("RGB"))
+                    output_path = os.path.join(save_paired_images_folder_path, f"{idx}.jpg")
+                    blended.convert("RGB").save(output_path, "JPEG")
+
+            fig, axes = plt.subplots(2, 2, figsize=(8, 8))
+            fig.suptitle("4帧合成对比", fontsize=16)
+
+            for i, ax in enumerate(axes.flat):
+                if i < len(blended_images) and blended_images[i] is not None:
+                    ax.imshow(blended_images[i])
+                    ax.set_title(f"Frame idx={idxs[i]}")
                 else:
-                    self.source_env.camera_wrapper.set_camera_pose(pos=pos, quat=quat)
-                    camera_pose = self.source_env.camera_wrapper.get_camera_pose_world_frame()
-                print("camera_pose", camera_pose)
-                self.source_env.camera_wrapper.set_camera_fov(fov=fov)
-                self.source_env.update_camera()
-                
-                source_robot_img, source_robot_seg_img = self.source_env.get_observation(white_background=True)
-                ########### Send message to target robot ############
-                variable = Data()
-                variable.camera_pose = camera_pose
-                variable.fov = fov
-                variable.success = (source_robot_img is not None)
-                variable.message = "Source robot has captured an image"
-                # Pickle the object and send it to the server
-                data_string = pickle.dumps(variable)
-                message_length = struct.pack("!I", len(data_string))
-                self.conn.send(message_length)
-                self.conn.send(data_string)
-                
-                if source_robot_img is None:
-                    print("No robot pixels in the image")
-                    continue
-                
-                pickled_message_size = self._receive_all_bytes(4)
-                message_size = struct.unpack("!I", pickled_message_size)[0]
-                data = self._receive_all_bytes(message_size)
-                target_env_robot_state = pickle.loads(data)
-                assert target_env_robot_state.message == "Target robot has captured an image", "Wrong synchronization"
-                success = target_env_robot_state.success
-                if not success:
-                    continue
-                
-                source_robot_img_brightness_augmented = change_brightness(source_robot_img, value=np.random.randint(-40, 40), mask=source_robot_seg_img)
-                print(f"\033[32m[NOTICE] 已完成第{pose_index}/{num_robot_poses}个pose的生成\033[0m")
-                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb", f"{counter}/{pose_index}.jpg"), cv2.cvtColor(source_robot_img, cv2.COLOR_RGB2BGR))
-                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb_brightness_augmented", f"{counter}/{pose_index}.jpg"), cv2.cvtColor(source_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
-                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_mask", f"{counter}/{pose_index}.jpg"), source_robot_seg_img * 255)
-                counter += 1
+                    ax.text(0.5, 0.5, "No image", ha='center', va='center')
+                ax.axis("off")
 
-        
+            save_path = os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_4frames_blend.jpg")
+            plt.savefig(save_path, bbox_inches='tight')
+            plt.show()
 
+            print(f"4帧合成结果已保存到 {save_path}")
 
 if __name__ == "__main__":
 
@@ -701,7 +692,6 @@ if __name__ == "__main__":
     'WipingGripper', 'Robotiq85Gripper', 'Robotiq140Gripper', 'RobotiqThreeFingerGripper', 'RobotiqThreeFingerDexterousGripper'
     """
 
-    # print welcome info
     print("Welcome to robosuite v{}!".format(suite.__version__))
     print(suite.__logo__)
 
@@ -711,7 +701,6 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=0, help="(optional) set seed")
     parser.add_argument("--source_gripper", type=str, default="PandaGripper", help="PandaGripper or Robotiq85Gripper")
     parser.add_argument("--num_robot_poses", type=int, default=5, help="(optional) number of robot poses to sample")
-    parser.add_argument("--target_robot", type=str, default="IIWA", help="(optional) (optional) set seed")
     parser.add_argument("--num_cam_poses_per_robot_pose", type=int, default=5, help="(optional) number of camera poses per robot pose to sample")
     parser.add_argument("--save_paired_images_folder_path", type=str, default="paired_images", help="(optional) folder path to save the paired images")
     parser.add_argument("--robot_dataset", type=str, help="(optional) to match the robot poses from a dataset, provide the dataset name")
@@ -722,17 +711,17 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action='store_true', help="If set, prints extra debug/warning information")
     args = parser.parse_args()
 
-    source_name = "Panda"
-    if source_name == "UR5e":
+    if args.robot_dataset == "autolab_ur5":
+        source_name = "UR5e"
         source_gripper = "Robotiq85Gripper"
-    elif source_name == "Panda":
+    else:
+        source_name = "Panda"
         source_gripper = "PandaGripper"
-
-    save_paired_images_folder_path = args.robot_dataset + "_" + args.target_robot + "_" + args.save_paired_images_folder_path
+    
+    save_paired_images_folder_path = args.save_paired_images_folder_path
     os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb"), exist_ok=True)
     os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb_brightness_augmented"), exist_ok=True)
     os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_mask"), exist_ok=True)
-    
     
     if args.robot_dataset is not None:
         from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
@@ -744,6 +733,6 @@ if __name__ == "__main__":
         camera_width = 256
     
     source_env = SourceEnvWrapper(source_name, source_gripper, camera_height, camera_width, connection=args.connection, port=args.port, verbose=args.verbose)
-    source_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, reference_ee_states_path=args.reference_ee_states_path, reference_gripper_states_path=args.reference_gripper_states_path ,robot_dataset=args.robot_dataset, start_id=args.start_id)
+    source_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, reference_ee_states_path=args.reference_ee_states_path, reference_gripper_states_path=args.reference_gripper_states_path, robot_dataset=args.robot_dataset, start_id=args.start_id)
 
     source_env.source_env.env.close_renderer()
