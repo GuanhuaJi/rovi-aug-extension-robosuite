@@ -20,6 +20,7 @@ from PIL import Image
 np.set_printoptions(suppress=True, precision=6)
 
 CAMERA_HISTORY_FILE = "camera_pose_history.txt"
+import math
 
 def load_camera_pose_history(filename=CAMERA_HISTORY_FILE):
     """
@@ -93,6 +94,13 @@ def gripper_convert(gripper_state_value, robot_type):
         return gripper_state_value > 0
     if robot_type == "autolab_ur5":
         return gripper_state_value == 0
+    if robot_type == "nyu_franka":
+        return gripper_state_value >= 0
+    if robot_type == "ucsd_kitchen_rlds":
+        return gripper_state_value > 0.5
+    if robot_type == "kaist":
+        return gripper_state_value 
+    print("UNKNOWN GRIPPER")
 
 def image_to_pointcloud(env, depth_map, camera_name, camera_height, camera_width, segmask=None):
     """
@@ -167,25 +175,6 @@ def compute_pose_error(current_pose, target_pose):
     error = min(np.linalg.norm(current_pose - target_pose),
                 np.linalg.norm(current_pose - np.concatenate((target_pose[:3], -target_pose[3:]))))
     return error
-
-'''
-def compute_pose_error(
-    current_pose,   
-    target_pose,    
-    position_weight=1.0,
-    orientation_weight=1.0
-):
-    current_pos = current_pose[:3]
-    current_quat = current_pose[3:]
-    target_pos = target_pose[:3]
-    target_quat = target_pose[3:]
-    pos_error = np.linalg.norm(current_pos - target_pos)
-    dot_val = abs(np.dot(current_quat, target_quat))
-    dot_val = np.clip(dot_val, 0.0, 1.0)
-    ori_error = 2.0 * np.arccos(dot_val)
-    total_error = position_weight * pos_error + orientation_weight * ori_error
-    return total_error
-'''
             
 def change_brightness(img, value=30, mask=None):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -250,6 +239,10 @@ class CameraWrapper:
         target_pose = np.concatenate((pos + offset, quat))
         current_pose = self.get_camera_pose_world_frame()
         error = compute_pose_error(current_pose, target_pose)
+
+    def set_camera_ball_params(self, lookat, distance, azimuth, elevation):
+        pos, quat = ball_to_cam_pose(lookat, distance, azimuth, elevation)
+        self.set_camera_pose(pos, quat)
             
     
     def get_camera_pose_world_frame(self):
@@ -296,21 +289,14 @@ class RobotCameraWrapper:
         self.camera_wrapper = CameraWrapper(self.env)
         
         print(robotname)
-        if robotname == "Panda":
-            self.default_joint_angles = [9.44962915e-03,  2.04028892e-01,  2.27688289e-02, -2.64987059e+00, 1.89505922e-03,  2.91240765e+00,  7.87470020e-01]
-        elif robotname == "UR5e":
-            self.default_joint_angles = [-0.46205679, -1.76595556, 2.47328085, -2.24068841, -1.59642081, -1.99376873]
-        elif robotname == "Sawyer":
-            self.default_joint_angles = [0.2553876936435699463, -0.03010351583361625671, -0.9372422099113464355, 1.432788133621215820, 1.421311497688293457, 0.9351797103881835938, -3.228875875473022461]
-        elif robotname == "Jaco":
-            self.default_joint_angles = [0.0, -1.2, 1.5, 0.0, 0.0, 0.0, 0.5]
-        elif robotname == "IIWA":
-            self.default_joint_angles = [0.0, -0.6, 0.0, 1.2, 0.0, 1.0, 0.0]
         
         if robotname == "Panda":
-            self.some_safe_joint_angles = [0.0, -0.785398, 0.0, -2.35619, 0.0, 1.5708, 0.785398]
+            self.some_safe_joint_angles = [-6.102706193923950195e-01, -1.455744981765747070e+00, 1.501405358314514160e+00, -2.240571022033691406e+00, -2.229462265968322754e-01, 2.963621616363525391e+00, -5.898305177688598633e-01]
+            #self.some_safe_joint_angles = [0.0, -0.785398, 0.0, -2.35619, 0.0, 1.5708, 0.785398]
+            #self.some_safe_joint_angles = [0.0, -1.785398, 0.7, 2.35619, 2.0, -1.5708, -0.785398]
         elif robotname == "UR5e":
             self.some_safe_joint_angles = [-3.3, -1.207356,  2.514808, -2.433074, -1.849945,  4.024987]
+            #self.some_safe_joint_angles = [-1.595451831817626953e-01, 4.841250777244567871e-01, -2.058936595916748047e+00, 6.007540225982666016e-01, 1.412800908088684082e+00, -3.485666529741138220e-04]
         elif robotname == "Sawyer":
             self.some_safe_joint_angles = [0.2553876936435699463, -0.03010351583361625671, -0.9372422099113464355, 1.432788133621215820, 1.421311497688293457, 0.9351797103881835938, -3.228875875473022461]
         elif robotname == "IIWA":
@@ -496,6 +482,10 @@ class SourceEnvWrapper:
                 joint_angles[:, 6] += 3.14159 / 4
             if dataset_name == "autolab_ur5":
                 joint_angles[:, 5] += 3.14159 / 2
+            if dataset_name == "asu_table_top_rlds":
+                joint_angles[:, 1] -= np.pi / 2
+                joint_angles[:, 2] *= -1
+                joint_angles[:, 3] -= np.pi / 2
         if "robot_ee_states_path" in info:
             ee_states_path = info["robot_ee_states_path"]
             ee_states = np.loadtxt(ee_states_path)
@@ -589,7 +579,10 @@ class SourceEnvWrapper:
             random_pose = sample_robot_ee_pose()
             reached, actual_pose = self.source_env.drive_robot_to_target_pose(target_pose=random_pose)
         
-        gripper_open = gripper_convert(gripper_states[pose_index], "autolab_ur5")
+        if robot_dataset == "kaist":
+            gripper_open = False
+        else:
+            gripper_open = gripper_convert(gripper_states[pose_index], robot_dataset)
         self.source_env.open_close_gripper(gripper_open=gripper_open)
         return reached, actual_pose
 
@@ -599,10 +592,12 @@ class SourceEnvWrapper:
         joint_angles, ee_states, gripper_states = self._load_dataset_files(info, robot_dataset)
         num_frames = joint_angles.shape[0]
         idxs = [
+            0,
             num_frames * 1 // 5,
             num_frames * 2 // 5,
             num_frames * 3 // 5,
-            num_frames * 4 // 5
+            num_frames * 4 // 5,
+            num_frames - 1
         ]
         print("选取的4个帧下标:", idxs)
 
@@ -622,7 +617,6 @@ class SourceEnvWrapper:
                 os.makedirs(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb", str(idx)), exist_ok=True)
                 os.makedirs(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb_brightness_augmented", str(idx)), exist_ok=True)
                 os.makedirs(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_mask", str(idx)), exist_ok=True)
-                gripper_open = gripper_convert(gripper_states[idx], "autolab_ur5")
                 reached = False
                 while not reached:
                     reached, actual_pose = self._drive_robot_to_pose_if_needed(
@@ -654,7 +648,7 @@ class SourceEnvWrapper:
                     cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_mask", f"{idx}/{counter}.jpg"), source_robot_seg_img * 255)
                     
                     img2 = Image.open(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb", f"{idx}/{counter}.jpg")).convert("RGBA")
-                    img1 = Image.open(f"./states/nyu_franka_play_dataset_converted_externally_to_rlds/episode_0/images/{idx}.jpeg").convert("RGBA")
+                    img1 = Image.open(f"./datasets/states/{robot_dataset}/episode_0/images/{idx}.jpeg").convert("RGBA")
 
                     if img1.size != img2.size:
                         img2 = img2.resize(img1.size)
@@ -663,7 +657,7 @@ class SourceEnvWrapper:
                     output_path = os.path.join(save_paired_images_folder_path, f"{idx}.jpg")
                     blended.convert("RGB").save(output_path, "JPEG")
 
-            fig, axes = plt.subplots(2, 2, figsize=(8, 8))
+            fig, axes = plt.subplots(2, 3, figsize=(8, 8))
             fig.suptitle("4帧合成对比", fontsize=16)
 
             for i, ax in enumerate(axes.flat):
@@ -679,6 +673,8 @@ class SourceEnvWrapper:
             plt.show()
 
             print(f"4帧合成结果已保存到 {save_path}")
+            print(f"[INFO] x={x}, y={y}, z={z}, roll={roll}, pitch={pitch}, yaw={yaw}, fov={fov}")
+            
 
 if __name__ == "__main__":
 
@@ -711,7 +707,7 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action='store_true', help="If set, prints extra debug/warning information")
     args = parser.parse_args()
 
-    if args.robot_dataset == "autolab_ur5":
+    if args.robot_dataset == "autolab_ur5" or args.robot_dataset == "asu_table_top_rlds":
         source_name = "UR5e"
         source_gripper = "Robotiq85Gripper"
     else:

@@ -11,11 +11,12 @@ import robosuite.macros as macros
 macros.IMAGE_CONVENTION = "opencv"
 
 from test_server import Data, RobotCameraWrapper, change_brightness
+from robot_pose_dict import ROBOT_POSE_DICT
 
 
 class TargetEnvWrapper:
-    def __init__(self, target_name, target_gripper, camera_height=256, camera_width=256, connection=None, port=50007):
-        self.target_env = RobotCameraWrapper(robotname=target_name, grippername=target_gripper, camera_height=camera_height, camera_width=camera_width)
+    def __init__(self, target_name, target_gripper, robot_dataset, camera_height=256, camera_width=256, connection=None, port=50007):
+        self.target_env = RobotCameraWrapper(robotname=target_name, grippername=target_gripper, robot_dataset=robot_dataset, camera_height=camera_height, camera_width=camera_width)
         self.target_name = target_name
         print("TARGET_NAME", target_name)
         if connection:
@@ -84,15 +85,21 @@ class TargetEnvWrapper:
                 source_env_robot_state = pickle.loads(data)
                 assert source_env_robot_state.message == "Source reached a target pose. Send target pose", "Wrong synchronization"
                 target_pose=source_env_robot_state.robot_pose
+
+                target_pose[:3] -= ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
+                '''
                 if robot_dataset == "viola" and self.target_name == "Jaco":
                     target_pose[:3] -= np.array([0, 0, 0.1])
                 elif robot_dataset == "austin_mutex" and self.target_name == "Jaco":
                     target_pose[:3] -= np.array([0, 0, 0.1])
+                elif robot_dataset == "nyu_franka" and self.target_name == "Jaco":
+                    target_pose[:3] += np.array([-0.1, 0, 0.1])
+                '''
                 
                 self.target_env.open_close_gripper(gripper_open=source_env_robot_state.gripper_open)
                 target_reached, target_reached_pose = self.target_env.drive_robot_to_target_pose(target_pose=target_pose)
                 source_index = source_env_robot_state.pose_index
-                ppose = self.target_env.compute_eef_pose()
+                ppose = self.target_env.compute_eef_pose()[:3] + ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
                 print("TARGET_REACHED_POSE:", ppose)
 
                 
@@ -124,10 +131,16 @@ class TargetEnvWrapper:
                 fov = source_env_robot_state.fov
                 camera_pose = source_env_robot_state.camera_pose
 
+                camera_pose[:3] -= ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
+                '''
                 if robot_dataset == "viola" and self.target_name == "Jaco":
                     camera_pose[:3] -= np.array([0, 0, 0.1])
                 elif robot_dataset == "austin_mutex" and self.target_name == "Jaco":
                     camera_pose[:3] -= np.array([0, 0, 0.1])
+                elif robot_dataset == "nyu_franka" and self.target_name == "Jaco":
+                    camera_pose[:3] += np.array([-0.1, 0, 0.1])
+                '''
+                
 
                 success = source_env_robot_state.success
                 if not success:
@@ -217,7 +230,7 @@ if __name__ == "__main__":
         target_gripper = "Robotiq85Gripper"
 
     # Save the captured images
-    save_paired_images_folder_path = args.robot_dataset + "_" + args.target_robot + "_" + args.save_paired_images_folder_path
+    save_paired_images_folder_path = "paired_images/" + args.robot_dataset + "_" + args.target_robot + "_" + args.save_paired_images_folder_path
     os.makedirs(os.path.join(save_paired_images_folder_path, "{}_rgb".format(target_name.lower())), exist_ok=True)
     os.makedirs(os.path.join(save_paired_images_folder_path, "{}_rgb_brightness_augmented".format(target_name.lower())), exist_ok=True)
     os.makedirs(os.path.join(save_paired_images_folder_path, "{}_mask".format(target_name.lower())), exist_ok=True)
@@ -231,7 +244,7 @@ if __name__ == "__main__":
         camera_height = 256
         camera_width = 256
     
-    target_env = TargetEnvWrapper(target_name, target_gripper, camera_height, camera_width, connection=args.connection, port=args.port)
+    target_env = TargetEnvWrapper(target_name, target_gripper, args.robot_dataset, camera_height, camera_width, connection=args.connection, port=args.port)
 
     target_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, reference_ee_states_path=args.reference_ee_states_path, robot_dataset=args.robot_dataset, start_id=args.start_id)
 
