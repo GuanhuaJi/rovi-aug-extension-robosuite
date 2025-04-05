@@ -166,18 +166,6 @@ def change_brightness(img, value=30, mask=None):
     img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
     return img
 
-class Data:
-    obs = {}
-    robot_pose = np.zeros(7)
-    camera_pose = np.zeros(7)
-    fov = 0
-    done = False
-    success = False
-    message = ""        
-    gripper_open = True
-    pose_index = 0
-
-
 class CameraWrapper:
     def __init__(self, env, camera_name="agentview"):
         self.env = env
@@ -441,24 +429,12 @@ class RobotCameraWrapper:
 
 
 class SourceEnvWrapper:
-    def __init__(self, source_name, source_gripper, robot_dataset, camera_height=256, camera_width=256, connection=None, port=50007, verbose=False):
+    def __init__(self, source_name, source_gripper, robot_dataset, camera_height=256, camera_width=256, verbose=False):
         self.source_env = RobotCameraWrapper(robotname=source_name, grippername=source_gripper, robot_dataset=robot_dataset, camera_height=camera_height, camera_width=camera_width)
         self.source_name = source_name
         self.fixed_cam_positions = None
         self.fixed_cam_quaternions = None
         self.verbose = verbose
-        if connection:
-            HOST = 'localhost'
-            PORT = port
-            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.s.bind((HOST, PORT))
-            self.s.listen(1)
-            self.conn, addr = self.s.accept()
-            print('Connected by', addr)
-        else:
-            self.s = None
-            self.conn = None
     
     def _receive_all_bytes(self, num_bytes: int) -> bytes:
         """
@@ -500,9 +476,15 @@ class SourceEnvWrapper:
         gripper_states = np.loadtxt(gripper_states_path)
         return joint_angles, ee_states, gripper_states
     
-    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, reference_gripper_states_path=None, robot_dataset=None, start_id=0):
+    def generate_image(self, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, reference_gripper_states_path=None, robot_dataset=None, episode=0):
         info = self._load_dataset_info(robot_dataset)
-        joint_angles, ee_states, gripper_states = self._load_dataset_files(info, robot_dataset)
+        joint_angles = np.loadtxt(os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "joint_states.txt"))
+        gripper_states = np.loadtxt(os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "gripper_states.txt"))
+        if robot_dataset == "toto":
+            joint_angles[:, 5] += 3.14159 / 2
+            joint_angles[:, 6] += 3.14159 / 4
+        if robot_dataset == "autolab_ur5":
+            joint_angles[:, 5] += 3.14159 / 2
         num_robot_poses = joint_angles.shape[0]
 
         camera_reference_position = info["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
@@ -512,20 +494,19 @@ class SourceEnvWrapper:
         fov = info["camera_fov"]
         r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
         camera_reference_quaternion = r.as_quat()
-        camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))      
-        for pose_index in tqdm(range(num_robot_poses), desc='Pose Generation'):
-            '''
-            if pose_index % 30 == 0:
-                self.source_env.env.reset()'
-            '''
-            
-            print(f"[INFO] 处理第{pose_index}个pose")
-            counter = 0
-            os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb", str(counter)), exist_ok=True)
-            os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb_brightness_augmented", str(counter)), exist_ok=True)
-            os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_mask", str(counter)), exist_ok=True)
+        camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
 
-            source_reached, target_reached = False, False
+        cam_position, cam_quaternion = camera_reference_pose[:3], camera_reference_pose[3:]
+        self.source_env.camera_wrapper.set_camera_pose(pos=cam_position, quat=cam_quaternion)
+        camera_pose = self.source_env.camera_wrapper.get_camera_pose_world_frame()
+        self.source_env.camera_wrapper.set_camera_fov(fov=fov)
+        self.source_env.update_camera()  
+
+        target_pose_list = []
+        gripper_list = []
+
+        for pose_index in tqdm(range(num_robot_poses), desc='Pose Generation'):    
+            source_reached = False
             attempt_counter = 0
             while source_reached == False:
                 attempt_counter += 1
@@ -541,6 +522,7 @@ class SourceEnvWrapper:
                     joint_angle = joint_angles[pose_index]
                     self.source_env.teleport_to_joint_positions(joint_angle)
                     source_reached_pose = self.source_env.compute_eef_pose()
+                    print(source_reached_pose)
                     source_reached, actual_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=source_reached_pose)
                     target_pose = actual_reached_pose
                     if not source_reached:
@@ -552,85 +534,22 @@ class SourceEnvWrapper:
                     target_pose = self.source_env.compute_eef_pose()
                     print("SOURCE_REACHED_POSE:", target_pose)
 
-            print("target need to reach:", target_pose)
-            attempt_counter = 0
-            while target_reached == False:
-                attempt_counter += 1
-                print(f"[INFO] TARGET 第{attempt_counter}次尝试")
-                if attempt_counter > 10:
-                    break
-
-                variable = Data()
-                variable.robot_pose = target_pose
-                variable.gripper_open = gripper_open
-                variable.message = "Source reached a target pose. Send target pose"
-                variable.pose_index = pose_index
-                data_string = pickle.dumps(variable)
-                message_length = struct.pack("!I", len(data_string))
-                self.conn.send(message_length)
-                self.conn.send(data_string)
-
-                pickled_message_size = self._receive_all_bytes(4)
-                message_size = struct.unpack("!I", pickled_message_size)[0]
-                data = self._receive_all_bytes(message_size)
-                target_env_robot_state = pickle.loads(data)
-                assert target_env_robot_state.message == "Target robot tries the target pose", "Wrong synchronization"
+            gripper_list.append(gripper_open)
+            target_pose_list.append(target_pose)
                 
-                if target_env_robot_state.success:
-                    target_reached = True
-            
+            source_robot_img, source_robot_seg_img = self.source_env.get_observation(white_background=True)
+                
+            source_robot_img_brightness_augmented = change_brightness(source_robot_img, value=np.random.randint(-40, 40), mask=source_robot_seg_img)
+            print(f"\033[32m[NOTICE] 已完成第{pose_index}/{num_robot_poses}个pose的生成\033[0m")
+            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name}_rgb", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(source_robot_img, cv2.COLOR_RGB2BGR))
+            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name}_rgb_brightness_augmented", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(source_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
+            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name}_mask", f"{episode}/{pose_index}.jpg"), source_robot_seg_img * 255)
+        
+        target_pose_array = np.vstack(target_pose_list)
+        gripper_array = np.vstack(gripper_list)
+        npz_path = os.path.join(save_paired_images_folder_path, f"{episode}.npz")
+        np.savez(npz_path, pos=target_pose_array, grip=gripper_array, camera=camera_reference_pose, fov=fov)
 
-
-            if not source_reached or not target_reached:
-                print(f"\033[33m[WARNING] 跳过第{pose_index}个pose\033[0m")
-                continue
-
-            if camera_reference_pose is not None:
-                ref_cam_position, ref_cam_quaternion = camera_reference_pose[:3], camera_reference_pose[3:]
-                cam_positions, cam_quaternions = [ref_cam_position] * num_cam_poses_per_robot_pose, [ref_cam_quaternion] * num_cam_poses_per_robot_pose
-            for i, (pos, quat) in enumerate(zip(cam_positions, cam_quaternions)):
-                if camera_reference_pose is not None:
-                    self.source_env.camera_wrapper.set_camera_pose(pos=pos, quat=quat)
-                    camera_pose = self.source_env.camera_wrapper.get_camera_pose_world_frame()
-                else:
-                    self.source_env.camera_wrapper.set_camera_pose(pos=pos, quat=quat)
-                    camera_pose = self.source_env.camera_wrapper.get_camera_pose_world_frame()
-                print("camera_pose", camera_pose)
-                self.source_env.camera_wrapper.set_camera_fov(fov=fov)
-                self.source_env.update_camera()
-                
-                source_robot_img, source_robot_seg_img = self.source_env.get_observation(white_background=True)
-                ########### Send message to target robot ############
-                variable = Data()
-                variable.camera_pose = camera_pose
-                variable.fov = fov
-                variable.success = (source_robot_img is not None)
-                variable.message = "Source robot has captured an image"
-                # Pickle the object and send it to the server
-                data_string = pickle.dumps(variable)
-                message_length = struct.pack("!I", len(data_string))
-                self.conn.send(message_length)
-                self.conn.send(data_string)
-                
-                if source_robot_img is None:
-                    print("No robot pixels in the image")
-                    continue
-                
-                pickled_message_size = self._receive_all_bytes(4)
-                message_size = struct.unpack("!I", pickled_message_size)[0]
-                data = self._receive_all_bytes(message_size)
-                target_env_robot_state = pickle.loads(data)
-                assert target_env_robot_state.message == "Target robot has captured an image", "Wrong synchronization"
-                success = target_env_robot_state.success
-                if not success:
-                    continue
-                
-                source_robot_img_brightness_augmented = change_brightness(source_robot_img, value=np.random.randint(-40, 40), mask=source_robot_seg_img)
-                print(f"\033[32m[NOTICE] 已完成第{pose_index}/{num_robot_poses}个pose的生成\033[0m")
-                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb", f"{counter}/{pose_index}.jpg"), cv2.cvtColor(source_robot_img, cv2.COLOR_RGB2BGR))
-                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb_brightness_augmented", f"{counter}/{pose_index}.jpg"), cv2.cvtColor(source_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
-                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_mask", f"{counter}/{pose_index}.jpg"), source_robot_seg_img * 255)
-                counter += 1
 
         
 
@@ -652,20 +571,15 @@ if __name__ == "__main__":
     print(suite.__logo__)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--connection", action='store_true', help="if True, the source robot will wait for the target robot to connect to it")
-    parser.add_argument("--port", type=int, default=50007, help="(optional) port for socket connection")
     parser.add_argument("--seed", type=int, default=0, help="(optional) set seed")
     parser.add_argument("--source_gripper", type=str, default="PandaGripper", help="PandaGripper or Robotiq85Gripper")
-    parser.add_argument("--num_robot_poses", type=int, default=5, help="(optional) number of robot poses to sample")
-    parser.add_argument("--target_robot", type=str, default="IIWA", help="(optional) (optional) set seed")
-    parser.add_argument("--num_cam_poses_per_robot_pose", type=int, default=5, help="(optional) number of camera poses per robot pose to sample")
     parser.add_argument("--save_paired_images_folder_path", type=str, default="paired_images", help="(optional) folder path to save the paired images")
     parser.add_argument("--robot_dataset", type=str, help="(optional) to match the robot poses from a dataset, provide the dataset name")
     parser.add_argument("--reference_joint_angles_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the joint angles file (np.savetxt)")
     parser.add_argument("--reference_ee_states_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the ee state file (np.savetxt)")
     parser.add_argument("--reference_gripper_states_path", type=str, help="(optional) to match the gripper's open/close status")
-    parser.add_argument("--start_id", type=int, default=0, help="(optional) starting index of the robot poses")
     parser.add_argument("--verbose", action='store_true', help="If set, prints extra debug/warning information")
+    parser.add_argument("--episode", type=int, default=0, help="episode number")
     args = parser.parse_args()
 
     if args.robot_dataset == "autolab_ur5" or args.robot_dataset == "asu_table_top_rlds":
@@ -675,10 +589,10 @@ if __name__ == "__main__":
         source_name = "Panda"
         source_gripper = "PandaGripper"
 
-    save_paired_images_folder_path = "paired_images/" + args.robot_dataset + "_" + args.target_robot + "_" + args.save_paired_images_folder_path
-    os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb"), exist_ok=True)
-    os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb_brightness_augmented"), exist_ok=True)
-    os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_mask"), exist_ok=True)
+    save_paired_images_folder_path = os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/paired_images", args.robot_dataset)
+    os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name}_rgb", str(args.episode)), exist_ok=True)
+    os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name}_rgb_brightness_augmented", str(args.episode)), exist_ok=True)
+    os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name}_mask", str(args.episode)), exist_ok=True)
     
     
     if args.robot_dataset is not None:
@@ -690,7 +604,14 @@ if __name__ == "__main__":
         camera_height = 256
         camera_width = 256
     
-    source_env = SourceEnvWrapper(source_name, source_gripper, args.robot_dataset, camera_height, camera_width, connection=args.connection, port=args.port, verbose=args.verbose)
-    source_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, reference_ee_states_path=args.reference_ee_states_path, reference_gripper_states_path=args.reference_gripper_states_path ,robot_dataset=args.robot_dataset, start_id=args.start_id)
+    source_env = SourceEnvWrapper(source_name, source_gripper, args.robot_dataset, camera_height, camera_width, verbose=args.verbose)
+    source_env.generate_image(
+        save_paired_images_folder_path=save_paired_images_folder_path, 
+        reference_joint_angles_path=args.reference_joint_angles_path, 
+        reference_ee_states_path=args.reference_ee_states_path, 
+        reference_gripper_states_path=args.reference_gripper_states_path,
+        robot_dataset=args.robot_dataset,
+        episode=args.episode
+    )
 
     source_env.source_env.env.close_renderer()

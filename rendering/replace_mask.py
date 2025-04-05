@@ -179,20 +179,20 @@ def images_to_video(folder_images, output_video_path, fps=25):
 
 def main():
     # 配置路径
-    dataset = "iamlab_cmu"
-    robot = "Sawyer"
+    dataset = "nyu_franka"
+    robot = "IIWA"
 
     if dataset == "autolab_ur5" or dataset == "asu_table_top_rlds":
         source_robot = "ur5e"
     else:
         source_robot = "panda"
     
-    folder_maskA = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{dataset}_{robot}_paired_images/{robot.lower()}_mask/0"
-    folder_A     = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{dataset}_{robot}_paired_images/{robot.lower()}_rgb/0"
-    folder_maskB = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{dataset}_{robot}_paired_images/{source_robot}_mask/0"
-    folder_B     = f"/home/jiguanhua/mirage/robot2robot/rendering/datasets/states/{dataset}/episode_0/images"
+    folder_maskA = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{dataset}_{robot}/{robot.lower()}_mask/1"
+    folder_A     = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{dataset}_{robot}/{robot.lower()}_rgb/1"
+    folder_maskB = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{dataset}_{robot}/{source_robot}_mask/1"
+    folder_B     = f"/home/jiguanhua/mirage/robot2robot/rendering/datasets/states/{dataset}/episode_1/images"
 
-    folder_out   = f"overlay/{dataset}_overlay_{robot}"  # 你想把输出的图像放在这里
+    folder_out   = f"overlay/{dataset}_{robot}_1"  # 你想把输出的图像放在这里
     resize_mode  = "A_to_B"
     fill_color   = (255,255,255,255)
 
@@ -204,7 +204,7 @@ def main():
                     fill_color=fill_color)
 
     # 第二步：将生成的图像合成为 MP4 视频
-    output_video = f"overlay/video/{dataset}_overlay_{robot}.mp4"
+    output_video = f"overlay/video/{dataset}_{robot}_1.mp4"
     images_to_video(folder_out, output_video_path=output_video, fps=25)
 
 if __name__ == "__main__":
