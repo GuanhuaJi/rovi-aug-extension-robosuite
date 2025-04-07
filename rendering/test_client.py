@@ -15,6 +15,47 @@ from robot_pose_dict import ROBOT_POSE_DICT
 from tqdm import tqdm
 
 
+from transforms3d.quaternions import quat2mat
+
+def offset_in_quaternion_direction_batch(positions, quaternions, offset_dist=0.05, local_direction=None):
+    """
+    批量处理:
+      - positions: shape = (N, 3) 的 numpy 数组，代表 N 个末端执行器的位置
+      - quaternions: shape = (N, 4) 或 (4,) 的 numpy 数组，代表与每个位置对应的四元数 (w, x, y, z)
+         * 如果 quaternions 的 shape = (4,) 表示所有位置都用同一个四元数
+      - offset_dist: 沿着 local_direction 在世界坐标系中偏移的距离 (默认 0.05)
+      - local_direction: 末端执行器在自身坐标系下的“前向”向量 (默认 [0, 0, -1])
+    
+    返回：
+      - new_positions: shape = (N, 3) 的 numpy 数组，偏移后的世界坐标位置
+    """
+    # 如果用户没有指定末端执行器在自身坐标系中的“指向”，默认用 -Z
+    if local_direction is None:
+        local_direction = np.array([0, 0, -1], dtype=float)
+    else:
+        local_direction = np.array(local_direction, dtype=float)
+
+    # 确保 positions 和 quaternions 都是 numpy 数组
+    positions = np.array(positions, dtype=float)
+    quaternions = np.array(quaternions, dtype=float)
+
+    # 如果只有一个四元数，则对所有 positions 都使用这个四元数
+    if quaternions.ndim == 1:  
+        # shape = (4,)
+        R = quat2mat(quaternions)  # 1 个旋转矩阵
+        world_dir = R.dot(local_direction)  # 在世界坐标系中的方向
+        new_positions = positions + offset_dist * world_dir
+        return new_positions
+    else:
+        # shape = (N, 4) -> 每个 position 对应一个 quaternion
+        new_positions = []
+        for pos, quat in zip(positions, quaternions):
+            R = quat2mat(quat)
+            world_dir = R.dot(local_direction)
+            new_pos = pos + offset_dist * world_dir
+            new_positions.append(new_pos)
+        return np.vstack(new_positions)
+
 
 class TargetEnvWrapper:
     def __init__(self, target_name, target_gripper, robot_dataset, camera_height=256, camera_width=256):
@@ -27,9 +68,12 @@ class TargetEnvWrapper:
         npz_path = os.path.join(save_paired_images_folder_path, f"{episode}.npz")
         data = np.load(npz_path, allow_pickle=True)
         target_pose_array = data['pos']
+        shift_dist = ROBOT_POSE_DICT[robot_dataset]['offset_dist']
+        target_pose_array[:, :3] = offset_in_quaternion_direction_batch(target_pose_array[:, :3], target_pose_array[:, 3:], shift_dist)
         gripper_array = data['grip']
         camera_pose = data['camera']
         camera_pose[:3] -= ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
+
         fov = data['fov']
 
         self.target_env.camera_wrapper.set_camera_pose(pos=camera_pose[:3], quat=camera_pose[3:])

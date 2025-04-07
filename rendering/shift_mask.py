@@ -1,12 +1,34 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import os
 import cv2
+import argparse
 import numpy as np
 
-# ========== 请在此处修改参数 ==========
-input_folder = "/home/jiguanhua/mirage/robot2robot/rendering/autolab_ur5_IIWA_paired_images/ur5e_mask_extend/0"  # 输入掩膜所在文件夹
-output_folder = "/home/jiguanhua/mirage/robot2robot/rendering/autolab_ur5_IIWA_paired_images/ur5e_mask_extend_shifted/0"  # 处理后结果输出文件夹
-shift_pixels = 20  # 向上平移的像素数，可自行调整
-# ======================================
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Shift binary masks upwards and combine them (union)."
+    )
+    parser.add_argument(
+        "--input_folder",
+        type=str,
+        default="./input",
+        help="Folder containing the original binary mask images."
+    )
+    parser.add_argument(
+        "--output_folder",
+        type=str,
+        default="./output",
+        help="Folder to save the processed mask images."
+    )
+    parser.add_argument(
+        "--shift_pixels",
+        type=int,
+        default=20,
+        help="Number of pixels to shift the mask upwards."
+    )
+    return parser.parse_args()
 
 def shift_mask_up(mask_binary, shift_pixels):
     """
@@ -19,17 +41,21 @@ def shift_mask_up(mask_binary, shift_pixels):
     # 创建一个同样大小的空白mask
     shifted = np.zeros((h, w), dtype=np.uint8)
 
-    # 若 shift_pixels >= h，全部移出图像，则结果全为0，可特殊处理
+    # 若 shift_pixels >= h，全部移出图像，则结果全为0
     if shift_pixels >= h:
         return shifted  # 全黑
-    
-    # 将 mask_binary 的[shift_pixels : h] 区域，复制到 shifted 的[0 : h-shift_pixels]
-    # 这会实现“向上”移动
+
+    # 将 mask_binary 的[shift_pixels : h] 区域，复制到 shifted 的[0 : h - shift_pixels]
     shifted[0 : h - shift_pixels, :] = mask_binary[shift_pixels : h, :]
 
     return shifted
 
 def main():
+    args = parse_args()
+    input_folder = args.input_folder
+    output_folder = args.output_folder
+    shift_pixels = args.shift_pixels
+
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
@@ -38,7 +64,7 @@ def main():
         in_path = os.path.join(input_folder, file_name)
         out_path = os.path.join(output_folder, file_name)
 
-        # 读取为灰度
+        # 读取为灰度图
         mask = cv2.imread(in_path, cv2.IMREAD_GRAYSCALE)
         if mask is None:
             print(f"无法读取图像文件: {file_name}, 跳过...")

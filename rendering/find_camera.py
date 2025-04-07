@@ -15,6 +15,7 @@ import robosuite.macros as macros
 macros.IMAGE_CONVENTION = "opencv"
 from scipy.spatial.transform import Rotation as R
 from PIL import Image
+from transforms3d.quaternions import quat2mat
 
 
 np.set_printoptions(suppress=True, precision=6)
@@ -170,6 +171,44 @@ def sample_robot_ee_pose():
     quat = T.mat2quat(sample_rotation_matrix())
     return np.concatenate((pos, quat))
 
+def offset_in_quaternion_direction_batch(positions, quaternions, offset_dist=0.03, local_direction=None):
+    """
+    批量处理:
+      - positions: shape = (N, 3) 的 numpy 数组，代表 N 个末端执行器的位置
+      - quaternions: shape = (N, 4) 或 (4,) 的 numpy 数组，代表与每个位置对应的四元数 (w, x, y, z)
+         * 如果 quaternions 的 shape = (4,) 表示所有位置都用同一个四元数
+      - offset_dist: 沿着 local_direction 在世界坐标系中偏移的距离 (默认 0.05)
+      - local_direction: 末端执行器在自身坐标系下的“前向”向量 (默认 [0, 0, -1])
+    
+    返回：
+      - new_positions: shape = (N, 3) 的 numpy 数组，偏移后的世界坐标位置
+    """
+    # 如果用户没有指定末端执行器在自身坐标系中的“指向”，默认用 -Z
+    if local_direction is None:
+        local_direction = np.array([1, 0, 0], dtype=float)
+    else:
+        local_direction = np.array(local_direction, dtype=float)
+
+    # 确保 positions 和 quaternions 都是 numpy 数组
+    positions = np.array(positions, dtype=float)
+    quaternions = np.array(quaternions, dtype=float)
+
+    # 如果只有一个四元数，则对所有 positions 都使用这个四元数
+    if quaternions.ndim == 1:  
+        # shape = (4,)
+        R = quat2mat(quaternions)  # 1 个旋转矩阵
+        world_dir = R.dot(local_direction)  # 在世界坐标系中的方向
+        new_positions = positions + offset_dist * world_dir
+        return new_positions
+    else:
+        # shape = (N, 4) -> 每个 position 对应一个 quaternion
+        new_positions = []
+        for pos, quat in zip(positions, quaternions):
+            R = quat2mat(quat)
+            world_dir = R.dot(local_direction)
+            new_pos = pos + offset_dist * world_dir
+            new_positions.append(new_pos)
+        return np.vstack(new_positions)
 
 def compute_pose_error(current_pose, target_pose):
     error = min(np.linalg.norm(current_pose - target_pose),
@@ -291,8 +330,8 @@ class RobotCameraWrapper:
         print(robotname)
         
         if robotname == "Panda":
-            self.some_safe_joint_angles = [-6.102706193923950195e-01, -1.455744981765747070e+00, 1.501405358314514160e+00, -2.240571022033691406e+00, -2.229462265968322754e-01, 2.963621616363525391e+00, -5.898305177688598633e-01]
-            #self.some_safe_joint_angles = [0.0, -0.785398, 0.0, -2.35619, 0.0, 1.5708, 0.785398]
+            #self.some_safe_joint_angles = [-6.102706193923950195e-01, -1.455744981765747070e+00, 1.501405358314514160e+00, -2.240571022033691406e+00, -2.229462265968322754e-01, 2.963621616363525391e+00, -5.898305177688598633e-01]
+            self.some_safe_joint_angles = [0.0, -0.785398, 0.0, -2.35619, 0.0, 1.5708, 0.785398]
             #self.some_safe_joint_angles = [0.0, -1.785398, 0.7, 2.35619, 2.0, -1.5708, -0.785398]
         elif robotname == "UR5e":
             self.some_safe_joint_angles = [-3.3, -1.207356,  2.514808, -2.433074, -1.849945,  4.024987]
@@ -574,7 +613,9 @@ class SourceEnvWrapper:
         elif reference_joint_angles is not None:
             joint_angle = reference_joint_angles[pose_index]
             self.source_env.teleport_to_joint_positions(joint_angle)
-            reached, actual_pose = self.source_env.drive_robot_to_target_pose(self.source_env.compute_eef_pose())
+            pose = self.source_env.compute_eef_pose()
+            pose[:3] = offset_in_quaternion_direction_batch(pose[:3], pose[3:])
+            reached, actual_pose = self.source_env.drive_robot_to_target_pose(pose)
         else:
             random_pose = sample_robot_ee_pose()
             reached, actual_pose = self.source_env.drive_robot_to_target_pose(target_pose=random_pose)
@@ -592,12 +633,10 @@ class SourceEnvWrapper:
         joint_angles, ee_states, gripper_states = self._load_dataset_files(info, robot_dataset)
         num_frames = joint_angles.shape[0]
         idxs = [
-            0,
             num_frames * 1 // 5,
             num_frames * 2 // 5,
             num_frames * 3 // 5,
-            num_frames * 4 // 5,
-            num_frames - 1
+            num_frames * 4 // 5
         ]
         print("选取的4个帧下标:", idxs)
 
@@ -648,7 +687,7 @@ class SourceEnvWrapper:
                     cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_mask", f"{idx}/{counter}.jpg"), source_robot_seg_img * 255)
                     
                     img2 = Image.open(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb", f"{idx}/{counter}.jpg")).convert("RGBA")
-                    img1 = Image.open(f"./datasets/states/{robot_dataset}/episode_0/images/{idx}.jpeg").convert("RGBA")
+                    img1 = Image.open(f"./datasets/states/{robot_dataset}/episode_4/images/{idx}.jpeg").convert("RGBA")
 
                     if img1.size != img2.size:
                         img2 = img2.resize(img1.size)
