@@ -8,7 +8,7 @@ import numpy as np
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Shift binary masks upwards and combine them (union)."
+        description="Shift binary masks in any direction (up, down, left, right, or diagonal) and combine them (union)."
     )
     parser.add_argument(
         "--input_folder",
@@ -23,30 +23,47 @@ def parse_args():
         help="Folder to save the processed mask images."
     )
     parser.add_argument(
-        "--shift_pixels",
+        "--shift_x",
         type=int,
-        default=20,
-        help="Number of pixels to shift the mask upwards."
+        default=0,
+        help="Horizontal shift (pixels). Positive = shift right, negative = shift left."
+    )
+    parser.add_argument(
+        "--shift_y",
+        type=int,
+        default=0,
+        help="Vertical shift (pixels). Positive = shift down, negative = shift up."
     )
     return parser.parse_args()
 
-def shift_mask_up(mask_binary, shift_pixels):
+def shift_mask(mask_binary, shift_x, shift_y):
     """
-    将二值掩膜向上平移 shift_pixels 个像素。超出顶部的部分被抛弃，底部新出现的部分填充为0。
-    :param mask_binary: 0/255 的二值图 (np.uint8)
-    :param shift_pixels: int, 向上平移的像素数
-    :return: 平移后的掩膜 (np.uint8, 0/255)
+    Shift a binary (0/255) mask in x and y directions.
+    :param mask_binary: 0/255 binary image (np.uint8)
+    :param shift_x: horizontal shift (int), >0 => right, <0 => left
+    :param shift_y: vertical shift (int), >0 => down,  <0 => up
+    :return: shifted mask (np.uint8, 0/255)
     """
     h, w = mask_binary.shape
-    # 创建一个同样大小的空白mask
+    # Create a new blank mask
     shifted = np.zeros((h, w), dtype=np.uint8)
 
-    # 若 shift_pixels >= h，全部移出图像，则结果全为0
-    if shift_pixels >= h:
-        return shifted  # 全黑
+    # Calculate the valid region for copying
+    # Where the new mask can receive pixels:
+    new_x_start = max(0, shift_x)
+    new_x_end   = min(w, w + shift_x)
+    new_y_start = max(0, shift_y)
+    new_y_end   = min(h, h + shift_y)
 
-    # 将 mask_binary 的[shift_pixels : h] 区域，复制到 shifted 的[0 : h - shift_pixels]
-    shifted[0 : h - shift_pixels, :] = mask_binary[shift_pixels : h, :]
+    # Corresponding old region from which we copy:
+    old_x_start = max(0, -shift_x)
+    old_x_end   = min(w, w - shift_x)
+    old_y_start = max(0, -shift_y)
+    old_y_end   = min(h, h - shift_y)
+
+    # Copy the valid region
+    shifted[new_y_start:new_y_end, new_x_start:new_x_end] = \
+        mask_binary[old_y_start:old_y_end, old_x_start:old_x_end]
 
     return shifted
 
@@ -54,7 +71,8 @@ def main():
     args = parse_args()
     input_folder = args.input_folder
     output_folder = args.output_folder
-    shift_pixels = args.shift_pixels
+    shift_x = args.shift_x
+    shift_y = args.shift_y
 
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -64,24 +82,24 @@ def main():
         in_path = os.path.join(input_folder, file_name)
         out_path = os.path.join(output_folder, file_name)
 
-        # 读取为灰度图
+        # Read as grayscale
         mask = cv2.imread(in_path, cv2.IMREAD_GRAYSCALE)
         if mask is None:
-            print(f"无法读取图像文件: {file_name}, 跳过...")
+            print(f"Unable to read image file: {file_name}, skipping...")
             continue
 
-        # 二值化（确保是0和255）
+        # Binarize (ensure 0 or 255)
         _, mask_binary = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
 
-        # 1) 将掩膜向上平移
-        mask_shifted = shift_mask_up(mask_binary, shift_pixels)
+        # 1) Shift the mask
+        mask_shifted = shift_mask(mask_binary, shift_x, shift_y)
 
-        # 2) 取并集：可以直接使用 bitwise_or
+        # 2) Take the union: bitwise_or
         union_mask = cv2.bitwise_or(mask_binary, mask_shifted)
 
-        # 保存结果
+        # Save the result
         cv2.imwrite(out_path, union_mask)
-        print(f"处理完成: {file_name} -> {out_path}")
+        print(f"Processed: {file_name} -> {out_path}")
 
 if __name__ == "__main__":
     main()

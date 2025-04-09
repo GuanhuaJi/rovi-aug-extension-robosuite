@@ -24,7 +24,7 @@ def gripper_convert(gripper_state_value, robot_type):
     elif robot_type == "furniture_bench":
         return gripper_state_value > 0.05
     elif robot_type == "viola":
-        return gripper_state_value > 0.02
+        return gripper_state_value > 0.06
     elif robot_type == "austin_sailor":
         return gripper_state_value > 0.05
     elif robot_type == "austin_mutex":
