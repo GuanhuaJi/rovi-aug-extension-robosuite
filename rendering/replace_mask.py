@@ -179,18 +179,18 @@ def images_to_video(folder_images, output_video_path, fps=25):
 
 def main():
     # 配置路径
-    dataset = "nyu_franka"
+    dataset = "can"
     robot = "IIWA"
 
     if dataset == "autolab_ur5" or dataset == "asu_table_top_rlds":
-        source_robot = "ur5e"
+        source_robot = "UR5e"
     else:
-        source_robot = "panda"
+        source_robot = "Panda"
     
-    folder_maskA = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{dataset}_{robot}/{robot.lower()}_mask/1"
-    folder_A     = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{dataset}_{robot}/{robot.lower()}_rgb/1"
-    folder_maskB = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{dataset}_{robot}/{source_robot}_mask/1"
-    folder_B     = f"/home/jiguanhua/mirage/robot2robot/rendering/datasets/states/{dataset}/episode_1/images"
+    folder_maskA = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{dataset}/{robot}_mask/0"
+    folder_A     = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{dataset}/{robot}_rgb/0"
+    folder_maskB = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{dataset}/{source_robot}_mask/0"
+    folder_B     = f"/home/jiguanhua/mirage/robot2robot/rendering/datasets/states/{dataset}/episode_0/images"
 
     folder_out   = f"overlay/{dataset}_{robot}_1"  # 你想把输出的图像放在这里
     resize_mode  = "A_to_B"

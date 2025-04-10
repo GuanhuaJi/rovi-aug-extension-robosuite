@@ -16,6 +16,64 @@ from tqdm import tqdm
 
 
 from transforms3d.quaternions import quat2mat
+def map_panda_to_robot_gripper(panda_gripper, target_robot):
+    """
+    Map a Panda gripper position (two-finger) to a corresponding gripper configuration 
+    for Jaco (3-finger), IIWA (2-finger), or Sawyer (2-finger).
+    
+    Args:
+        panda_gripper (list or tuple of length 2):
+            E.g. [0.02, -0.02], representing each Panda finger joint in meters.
+        target_robot (str):
+            One of {"Jaco", "IIWA", "Sawyer"}.
+    
+    Returns:
+        list of float:
+            - For Sawyer or IIWA (both 2-finger), returns 2 values (e.g. [new_left, new_right]).
+            - For Jaco (3-finger), returns 3 values (base joint positions).
+
+    Assumptions:
+        - Panda max open distance ~ 0.08m
+        - Sawyer/IIWA max open distance ~ 0.05m (adjust as needed)
+        - Jaco root joint range [0.0, 1.0] (often ~1.0 => fully open, 0.0 => closed)
+    """
+
+    # 1) Panda’s max open distance (tune to your actual model)
+    panda_max_open = 0.08  # meters
+
+    # Extract the two Panda finger positions
+    panda_left, panda_right = panda_gripper
+
+    # Current Panda open distance
+    panda_current_open = abs(panda_left - panda_right)
+
+    # 2) Compute open ratio and clamp to [0, 1]
+    open_ratio = panda_current_open / panda_max_open
+    open_ratio = max(0.0, min(1.0, open_ratio))  # clamp
+
+    # 3) Depending on the target robot, map open_ratio to its range
+    if target_robot == "Sawyer" or target_robot == "IIWA":
+        # Assume both Sawyer and IIWA have a parallel-jaw gripper with some max open distance
+        # (tweak this based on your model’s real maximum)
+        target_max_open = 0.05  # meters
+        
+        # New distance in [0, target_max_open]
+        new_dist = open_ratio * target_max_open
+        
+        # Return two symmetric positions, e.g. +x and -x
+        # (If your model uses a different approach—like 0 to new_dist—adapt as needed.)
+        left_finger  =  new_dist / 2
+        right_finger = -new_dist / 2
+        return [left_finger, right_finger]
+
+    elif target_robot == "Jaco":
+        # Jaco typically has 3 base joints each in [0, 1] (0 = closed, 1 = open)
+        # We treat open_ratio as directly the Jaco joint value
+        jaco_val = open_ratio * 1.0  # if max is 1.0
+        return [jaco_val, jaco_val, jaco_val]
+
+    else:
+        raise ValueError(f"Unknown target_robot: {target_robot}")
 
 def offset_in_quaternion_direction_batch(positions, quaternions, offset_dist=0.05, local_direction=None):
     """
@@ -71,18 +129,21 @@ class TargetEnvWrapper:
         shift_dist = ROBOT_POSE_DICT[robot_dataset]['offset_dist']
         target_pose_array[:, :3] = offset_in_quaternion_direction_batch(target_pose_array[:, :3], target_pose_array[:, 3:], shift_dist)
         gripper_array = data['grip']
+
         camera_pose = data['camera']
         camera_pose[:3] -= ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
 
-        fov = data['fov']
 
         self.target_env.camera_wrapper.set_camera_pose(pos=camera_pose[:3], quat=camera_pose[3:])
-        self.target_env.camera_wrapper.set_camera_fov(fov=fov)
+
+        if "fov" in data:
+            fov = data["fov"]
+            self.target_env.camera_wrapper.set_camera_fov(fov)
         self.target_env.update_camera()
 
         num_robot_poses = target_pose_array.shape[0]
         
-        for pose_index in tqdm(range(num_robot_poses), desc='Pose Generation'):
+        for pose_index in tqdm(range(num_robot_poses), desc=f'{self.target_name} Pose Generation'):
             '''
             if pose_index % 30 == 0: # to avoid simulation becoming unstable
                 self.target_env.env.reset()
@@ -97,8 +158,11 @@ class TargetEnvWrapper:
             elif robot_dataset == "nyu_franka" and self.target_name == "Jaco":
                 target_pose[:3] += np.array([-0.1, 0, 0.1])
             '''
-            
-            self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
+            if type(gripper_array[pose_index]) is bool:
+                self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
+            else:
+                gripper_values = map_panda_to_robot_gripper(gripper_array[pose_index], self.target_name)
+                self.target_env.set_gripper_joint_positions(gripper_values, self.target_name)
             target_reached, target_reached_pose = self.target_env.drive_robot_to_target_pose(target_pose=target_pose)
             ppose = self.target_env.compute_eef_pose()[:3] + ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
             print("TARGET_REACHED_POSE:", ppose)

@@ -15,6 +15,7 @@ import robosuite.macros as macros
 macros.IMAGE_CONVENTION = "opencv"
 from scipy.spatial.transform import Rotation as R
 from tqdm import tqdm
+from robot_pose_dict import ROBOT_POSE_DICT
 
 np.set_printoptions(suppress=True, precision=6)
 
@@ -39,6 +40,12 @@ def gripper_convert(gripper_state_value, robot_type):
         return gripper_state_value < 0
     elif robot_type == "iamlab_cmu":
         return gripper_state_value > 0.5
+    elif robot_type == "can":
+        return gripper_state_value
+    elif robot_type == "lift":
+        return gripper_state_value
+    elif robot_type == "square":
+        return gripper_state_value
     print("UNKNOWN GRIPPER")
     return None
 
@@ -303,7 +310,7 @@ class RobotCameraWrapper:
             self.env.sim.data.qvel[qpos_addr] = 0.0
         self.env.sim.forward()
 
-    def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.003, num_iter_max=100):
+    def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.004, num_iter_max=100):
         # breakpoint()
         # reset robot joint positions so the robot is hopefully not in a weird pose
         self.set_robot_joint_positions()
@@ -351,21 +358,6 @@ class RobotCameraWrapper:
 
             error = new_error
             num_iters += 1
-
-        '''
-        if np.linalg.norm(current_pose - target_pose) < np.linalg.norm(current_pose - np.concatenate((target_pose[:3], -target_pose[3:]))):
-            current_pose_num = [format(num, '.10f') for num in current_pose]
-            target_pose_num = [format(num, '.10f') for num in target_pose]
-            print("CURRENT POSE", current_pose_num)
-            print("TARGET  POSE", target_pose_num)
-        else:
-            target_pose_opp = np.concatenate((target_pose[:3], -target_pose[3:]))
-            current_pose_num = [format(num, '.10f') for num in current_pose]
-            target_pose_num = [format(num, '.10f') for num in target_pose_opp]
-            print("CURRENT POSE", current_pose_num)
-            print("TARGET  POSE", target_pose_num)
-        print("ERROR", error)
-        '''
         print("ERROR", error)
         # print("Take {} iterations to drive robot to target pose".format(num_iters))
         current_pose = self.compute_eef_pose()
@@ -374,11 +366,6 @@ class RobotCameraWrapper:
             
             return True, current_pose
         except:
-            '''
-            print("Starting states are not the same\n"
-                    "Source: ", current_pose,
-                    "Target: ", target_pose)
-            '''
             return False, current_pose
 
     def set_robot_joint_positions(self, joint_angles=None):
@@ -389,6 +376,20 @@ class RobotCameraWrapper:
             self.env.sim.forward()
             self.env.sim.step()
             self.env._update_observables()
+
+    def set_gripper_joint_positions(self, finger_qpos, robot_name):
+        if robot_name == "Panda":
+            gripper_joint_names = ["gripper0_finger_joint1", "gripper0_finger_joint2"]
+        elif robot_name == "IIWA":
+            gripper_joint_names = ["gripper0_finger_joint"]
+        elif robot_name == "Sawyer":
+            gripper_joint_names = ['gripper0_l_finger_joint', 'gripper0_r_finger_joint']
+        elif robot_name == "Jaco":
+            gripper_joint_names = ["gripper0_joint_thumb", "gripper0_joint_index", "gripper0_joint_pinky",]
+        
+        for i, joint_name in enumerate(gripper_joint_names):
+            self.env.sim.data.set_joint_qpos(joint_name, finger_qpos[i])
+        self.env.sim.forward()
     
     def open_close_gripper(self, gripper_open=True):
         self.env.robots[0].controller.use_delta = True # change to delta pose
@@ -487,25 +488,39 @@ class SourceEnvWrapper:
             joint_angles[:, 5] += 3.14159 / 2
         num_robot_poses = joint_angles.shape[0]
 
-        camera_reference_position = info["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
-        roll_deg = info["roll"]
-        pitch_deg = info["pitch"]
-        yaw_deg = info["yaw"]
-        fov = info["camera_fov"]
-        r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
-        camera_reference_quaternion = r.as_quat()
-        camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
+        if robot_dataset == "can":
+            camera_reference_pose = np.array([0.9, 0.1, 1.75, 0.271, 0.271, 0.653, 0.653])
+            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+        elif robot_dataset == "lift":
+            camera_reference_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+        elif robot_dataset == "square":
+            camera_reference_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+        else:
+            camera_reference_position = info["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
+            roll_deg = info["roll"]
+            pitch_deg = info["pitch"]
+            yaw_deg = info["yaw"]
+            fov = info["camera_fov"]
+            r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
+            camera_reference_quaternion = r.as_quat()
+            camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
 
         cam_position, cam_quaternion = camera_reference_pose[:3], camera_reference_pose[3:]
         self.source_env.camera_wrapper.set_camera_pose(pos=cam_position, quat=cam_quaternion)
         camera_pose = self.source_env.camera_wrapper.get_camera_pose_world_frame()
-        self.source_env.camera_wrapper.set_camera_fov(fov=fov)
-        self.source_env.update_camera()  
+        if fov is not None:
+            self.source_env.camera_wrapper.set_camera_fov(fov=fov)
+        self.source_env.update_camera() 
 
         target_pose_list = []
         gripper_list = []
 
-        for pose_index in tqdm(range(num_robot_poses), desc='Pose Generation'):    
+        for pose_index in tqdm(range(num_robot_poses), desc=f'{self.source_name} Pose Generation'):    
             source_reached = False
             attempt_counter = 0
             while source_reached == False:
@@ -522,7 +537,6 @@ class SourceEnvWrapper:
                     joint_angle = joint_angles[pose_index]
                     self.source_env.teleport_to_joint_positions(joint_angle)
                     source_reached_pose = self.source_env.compute_eef_pose()
-                    print(source_reached_pose)
                     source_reached, actual_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=source_reached_pose)
                     target_pose = actual_reached_pose
                     if not source_reached:
@@ -530,9 +544,12 @@ class SourceEnvWrapper:
                             print("Source robot failed to reach the desired pose")
                         else:
                             continue
-                    self.source_env.open_close_gripper(gripper_open=gripper_open)
+                    if type(gripper_open) is bool:
+                        self.source_env.open_close_gripper(gripper_open=gripper_open)
+                    else:
+                        self.source_env.set_gripper_joint_positions(gripper_states[pose_index])
+                        gripper_open = gripper_states[pose_index]
                     target_pose = self.source_env.compute_eef_pose()
-                    print("SOURCE_REACHED_POSE:", target_pose)
 
             gripper_list.append(gripper_open)
             target_pose_list.append(target_pose)
