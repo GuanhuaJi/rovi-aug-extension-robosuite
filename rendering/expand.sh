@@ -10,7 +10,7 @@ fi
 python expand_mask.py \
     --input_folder /home/jiguanhua/mirage/robot2robot/rendering/paired_images/${robot_dataset}/${source_robot}_mask/${episode} \
     --output_folder /home/jiguanhua/mirage/robot2robot/rendering/paired_images/${robot_dataset}/${source_robot}_mask_expanded/${episode} \
-    --alpha 1.0 \
+    --alpha 5.0 \
     --use_8_connected
 
 

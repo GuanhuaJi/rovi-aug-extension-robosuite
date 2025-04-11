@@ -132,7 +132,7 @@ class TargetEnvWrapper:
 
         camera_pose = data['camera']
         camera_pose[:3] -= ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
-
+        # gripper_v = 0.8
 
         self.target_env.camera_wrapper.set_camera_pose(pos=camera_pose[:3], quat=camera_pose[3:])
 
@@ -158,14 +158,16 @@ class TargetEnvWrapper:
             elif robot_dataset == "nyu_franka" and self.target_name == "Jaco":
                 target_pose[:3] += np.array([-0.1, 0, 0.1])
             '''
-            if type(gripper_array[pose_index]) is bool:
-                self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
-            else:
-                gripper_values = map_panda_to_robot_gripper(gripper_array[pose_index], self.target_name)
-                self.target_env.set_gripper_joint_positions(gripper_values, self.target_name)
+            #print(gripper_array[pose_index], type(gripper_array[pose_index]))
+            self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
+            # if type(gripper_array[pose_index][0]) is bool:
+            #     self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
+            # else:
+            #     gripper_values = map_panda_to_robot_gripper(gripper_array[pose_index], self.target_name)
+            #     self.target_env.set_gripper_joint_positions(gripper_values, self.target_name)
             target_reached, target_reached_pose = self.target_env.drive_robot_to_target_pose(target_pose=target_pose)
             ppose = self.target_env.compute_eef_pose()[:3] + ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
-            print("TARGET_REACHED_POSE:", ppose)
+            #print("TARGET_REACHED_POSE:", ppose)
             
             
             '''
@@ -179,7 +181,7 @@ class TargetEnvWrapper:
             
             joint_indices = self.target_env.env.robots[0]._ref_joint_pos_indexes
             current_joint_angles = self.target_env.env.sim.data.qpos[joint_indices]
-            print("Current joint angles:", current_joint_angles)
+            #print("Current joint angles:", current_joint_angles)
 
             target_robot_img, target_robot_seg_img = self.target_env.get_observation(white_background=True)
             

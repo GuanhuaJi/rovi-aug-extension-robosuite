@@ -328,23 +328,6 @@ class RobotCameraWrapper:
             action[:3] = target_pose[:3]
             action[3:6] = T.quat2axisangle(target_pose[3:])
 
-
-            # 如果最近几步误差几乎不变，判定为“卡住”，就加一点随机扰动
-            '''
-            if no_improve_steps > 10:
-                #print("[DEBUG] Hard reset posture to unlock")
-                #self.set_robot_joint_positions(self.some_safe_joint_angles)
-                if self.robot_name == 'UR5e':
-                    self.some_safe_joint_angles += np.random.normal(0, 0.1, (6))
-                else:
-                    self.some_safe_joint_angles += np.random.normal(0, 0.1, (7))
-                self.set_robot_joint_positions()
-                # env.step() 多次
-                for _ in range(200):
-                    self.env.sim.forward()
-                    self.env.sim.step()
-                no_improve_steps = 0
-            '''
             obs, _, _, _ = self.env.step(action)
             current_pose = self.compute_eef_pose()
             current_joints = self.env.sim.data.qpos[self.env.robots[0]._ref_joint_pos_indexes].copy()
@@ -358,7 +341,7 @@ class RobotCameraWrapper:
 
             error = new_error
             num_iters += 1
-        print("ERROR", error)
+        # print("ERROR", error)
         # print("Take {} iterations to drive robot to target pose".format(num_iters))
         current_pose = self.compute_eef_pose()
         try:
@@ -381,7 +364,7 @@ class RobotCameraWrapper:
         if robot_name == "Panda":
             gripper_joint_names = ["gripper0_finger_joint1", "gripper0_finger_joint2"]
         elif robot_name == "IIWA":
-            gripper_joint_names = ["gripper0_finger_joint"]
+            gripper_joint_names = ["gripper0_finger_joint", "gripper0_right_outer_knuckle_joint"]
         elif robot_name == "Sawyer":
             gripper_joint_names = ['gripper0_l_finger_joint', 'gripper0_r_finger_joint']
         elif robot_name == "Jaco":
@@ -389,7 +372,9 @@ class RobotCameraWrapper:
         
         for i, joint_name in enumerate(gripper_joint_names):
             self.env.sim.data.set_joint_qpos(joint_name, finger_qpos[i])
-        self.env.sim.forward()
+        for _ in range(10):
+            self.env.sim.forward()
+            self.env.sim.step()
     
     def open_close_gripper(self, gripper_open=True):
         self.env.robots[0].controller.use_delta = True # change to delta pose
@@ -398,8 +383,9 @@ class RobotCameraWrapper:
             action[-1] = 1
         else:
             action[-1] = -1
-        for _ in range(10):            
-            obs, _, _, _ = self.env.step(action)
+        # for _ in range(10):            
+        #     obs, _, _, _ = self.env.step(action)
+        obs, _, _, _ = self.env.step(action)
     
     def update_camera(self):
         for _ in range(50):
@@ -414,8 +400,8 @@ class RobotCameraWrapper:
         seg_img = obs[f'{view}_segmentation_robot_only']
         # count the number of robot pixels
         num_robot_pixels = np.sum(seg_img)
-        if num_robot_pixels <= 700:
-            print(num_robot_pixels, " robot pixels in the image")
+        #if num_robot_pixels <= 700:
+            #print(num_robot_pixels, " robot pixels in the image")
             #return None, None
         
         # Create a mask where non-robot pixels are set to 0 and robot pixels are set to 1
@@ -525,7 +511,7 @@ class SourceEnvWrapper:
             attempt_counter = 0
             while source_reached == False:
                 attempt_counter += 1
-                print(f"[INFO] SOURCE 第{attempt_counter}次尝试")
+                #print(f"[INFO] SOURCE 第{attempt_counter}次尝试")
                 if attempt_counter > 10:
                     break
                 if robot_dataset == "kaist":
@@ -547,8 +533,8 @@ class SourceEnvWrapper:
                     if type(gripper_open) is bool:
                         self.source_env.open_close_gripper(gripper_open=gripper_open)
                     else:
-                        self.source_env.set_gripper_joint_positions(gripper_states[pose_index])
-                        gripper_open = gripper_states[pose_index]
+                        self.source_env.set_gripper_joint_positions(gripper_states[pose_index], self.source_name)
+                        gripper_open = (gripper_states[pose_index][0] - gripper_states[pose_index][1]) > 0.06
                     target_pose = self.source_env.compute_eef_pose()
 
             gripper_list.append(gripper_open)
@@ -557,7 +543,7 @@ class SourceEnvWrapper:
             source_robot_img, source_robot_seg_img = self.source_env.get_observation(white_background=True)
                 
             source_robot_img_brightness_augmented = change_brightness(source_robot_img, value=np.random.randint(-40, 40), mask=source_robot_seg_img)
-            print(f"\033[32m[NOTICE] 已完成第{pose_index}/{num_robot_poses}个pose的生成\033[0m")
+            #print(f"\033[32m[NOTICE] 已完成第{pose_index}/{num_robot_poses}个pose的生成\033[0m")
             cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name}_rgb", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(source_robot_img, cv2.COLOR_RGB2BGR))
             cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name}_rgb_brightness_augmented", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(source_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
             cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name}_mask", f"{episode}/{pose_index}.jpg"), source_robot_seg_img * 255)
