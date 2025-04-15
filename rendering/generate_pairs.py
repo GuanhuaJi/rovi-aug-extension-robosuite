@@ -3,18 +3,17 @@ import subprocess
 
 def main():
     # Define variables
-    robot_dataset = "can"
+    robot_dataset = "square"
     # Change this to the source robot you want to run
-    source_robot = "IIWA"
+    source_robot = "Panda"
 
     # Create a copy of the current environment variables
     env = os.environ.copy()
     env["CUDA_VISIBLE_DEVICES"] = "0"
 
     # Loop through episodes 0 to 19
-    for episode in range(1, 20):
+    for episode in range(117, 200):
         print(f"Processing episode {episode}...")
-
         # 1. Run test_server.py
         subprocess.run([
             "python", "test_server.py",
@@ -31,6 +30,15 @@ def main():
                 "--episode", str(episode)
             ], env=env, check=True)
 
+        input_folder = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{robot_dataset}/{source_robot}_mask/{episode}"
+        output_folder = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{robot_dataset}/{source_robot}_mask/{episode}"
+        subprocess.run([
+            "python", "remove_small_points.py",
+            input_folder,
+            output_folder,
+            "--min_size", "10"
+        ], env=env, check=True)
+
         # 3. Run expand_mask.py
         input_folder = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{robot_dataset}/{source_robot}_mask/{episode}"
         output_folder = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{robot_dataset}/{source_robot}_mask_expanded/{episode}"
@@ -38,7 +46,7 @@ def main():
             "python", "expand_mask.py",
             "--input_folder", input_folder,
             "--output_folder", output_folder,
-            "--alpha", "5.0",
+            "--alpha", "2.0",
             "--use_8_connected"
         ], env=env, check=True)
 

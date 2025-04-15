@@ -310,7 +310,7 @@ class RobotCameraWrapper:
             self.env.sim.data.qvel[qpos_addr] = 0.0
         self.env.sim.forward()
 
-    def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.004, num_iter_max=100):
+    def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.006, num_iter_max=100):
         # breakpoint()
         # reset robot joint positions so the robot is hopefully not in a weird pose
         self.set_robot_joint_positions()
@@ -550,6 +550,10 @@ class SourceEnvWrapper:
         
         target_pose_array = np.vstack(target_pose_list)
         gripper_array = np.vstack(gripper_list)
+        eef_npy_path = os.path.join(
+            save_paired_images_folder_path, f"{self.source_name}_eef_states_{episode}.npy"
+        )
+        np.save(eef_npy_path, target_pose_array)
         npz_path = os.path.join(save_paired_images_folder_path, f"{episode}.npz")
         np.savez(npz_path, pos=target_pose_array, grip=gripper_array, camera=camera_reference_pose, fov=fov)
 

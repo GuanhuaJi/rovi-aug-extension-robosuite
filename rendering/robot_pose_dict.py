@@ -235,7 +235,7 @@ ROBOT_POSE_DICT = {
             "displacement": np.array([0, 0, 0])
         },
         "IIWA": {
-            "safe_angle": [-0.095583,  0.246849,  0.210468, -1.817155,  6.216322,  1.064266,  6.393936],
+            "safe_angle": [-0.183667,  1.264584,  1.254537, -0.965978,  5.342105,  1.415845,  7.254077],
             "displacement": np.array([0, 0, 0])
         },
         "Sawyer": {
@@ -244,7 +244,7 @@ ROBOT_POSE_DICT = {
         },
         "Jaco": {
             "safe_angle": [-3.090315, 1.409086,  1.500532, 1.821214, -4.4519,    4.718327,  1.770046],
-            "displacement": np.array([0, 0, 0])
+            "displacement": np.array([0.05, 0, 0])
         },
         "offset_dist": 0
     },

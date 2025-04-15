@@ -142,6 +142,7 @@ class TargetEnvWrapper:
         self.target_env.update_camera()
 
         num_robot_poses = target_pose_array.shape[0]
+        target_pose_list = []
         
         for pose_index in tqdm(range(num_robot_poses), desc=f'{self.target_name} Pose Generation'):
             '''
@@ -167,6 +168,8 @@ class TargetEnvWrapper:
             #     self.target_env.set_gripper_joint_positions(gripper_values, self.target_name)
             target_reached, target_reached_pose = self.target_env.drive_robot_to_target_pose(target_pose=target_pose)
             ppose = self.target_env.compute_eef_pose()[:3] + ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
+            target_pose_list.append(ppose)
+
             #print("TARGET_REACHED_POSE:", ppose)
             
             
@@ -181,7 +184,7 @@ class TargetEnvWrapper:
             
             joint_indices = self.target_env.env.robots[0]._ref_joint_pos_indexes
             current_joint_angles = self.target_env.env.sim.data.qpos[joint_indices]
-            #print("Current joint angles:", current_joint_angles)
+            print("Current joint angles:", current_joint_angles)
 
             target_robot_img, target_robot_seg_img = self.target_env.get_observation(white_background=True)
             
@@ -191,6 +194,11 @@ class TargetEnvWrapper:
             cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_rgb", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(target_robot_img, cv2.COLOR_RGB2BGR))
             cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_rgb_brightness_augmented", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(target_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
             cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_mask", f"{episode}/{pose_index}.jpg"), target_robot_seg_img * 255)
+        
+        target_pose_array = np.vstack(target_pose_list)
+        eef_npy_path = os.path.join(save_paired_images_folder_path, f"{self.target_name}_eef_states_{episode}.npy")
+        np.save(eef_npy_path, target_pose_array)
+
 
         
         

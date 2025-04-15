@@ -89,8 +89,8 @@
 #CUDA_VISIBLE_DEVICES=0 python test_server.py --connection --port 60029 --num_robot_poses 50000 --num_cam_poses_per_robot_pose 1 --robot_dataset "iamlab_cmu" --target_robot "Jaco" --start_id 0 &
 #CUDA_VISIBLE_DEVICES=0 python test_client.py --connection --port 60029 --num_robot_poses 50000 --num_cam_poses_per_robot_pose 1 --robot_dataset "iamlab_cmu" --target_robot "Jaco" --start_id 0
 
-robot_dataset="can"
-episode=1
+robot_dataset="square"
+episode=0
 
 CUDA_VISIBLE_DEVICES=0 python test_server.py --robot_dataset $robot_dataset --episode $episode
 CUDA_VISIBLE_DEVICES=0 python test_client.py --robot_dataset $robot_dataset --target_robot "IIWA" --episode $episode

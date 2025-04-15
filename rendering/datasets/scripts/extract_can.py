@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image
 
 def main():
-    hdf5_path = "/home/jiguanhua/mirage/robot2robot/rendering/datasets/datasets/can/ph/image.hdf5"
+    hdf5_path = "/home/jiguanhua/mirage/robot2robot/image84/can/image_84.hdf5"
 
     with h5py.File(hdf5_path, "r") as f:
         data_group = f["data"]
