@@ -463,7 +463,7 @@ class SourceEnvWrapper:
         gripper_states = np.loadtxt(gripper_states_path)
         return joint_angles, ee_states, gripper_states
     
-    def generate_image(self, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, reference_gripper_states_path=None, robot_dataset=None, episode=0):
+    def get_source_robot_states(self, save_source_robot_states_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, reference_gripper_states_path=None, robot_dataset=None, episode=0):
         info = self._load_dataset_info(robot_dataset)
         joint_angles = np.loadtxt(os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "joint_states.txt"))
         gripper_states = np.loadtxt(os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "gripper_states.txt"))
@@ -496,13 +496,6 @@ class SourceEnvWrapper:
             camera_reference_quaternion = r.as_quat()
             camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
 
-        cam_position, cam_quaternion = camera_reference_pose[:3], camera_reference_pose[3:]
-        self.source_env.camera_wrapper.set_camera_pose(pos=cam_position, quat=cam_quaternion)
-        camera_pose = self.source_env.camera_wrapper.get_camera_pose_world_frame()
-        if fov is not None:
-            self.source_env.camera_wrapper.set_camera_fov(fov=fov)
-        self.source_env.update_camera() 
-
         target_pose_list = []
         gripper_list = []
 
@@ -511,7 +504,6 @@ class SourceEnvWrapper:
             attempt_counter = 0
             while source_reached == False:
                 attempt_counter += 1
-                #print(f"[INFO] SOURCE 第{attempt_counter}次尝试")
                 if attempt_counter > 10:
                     break
                 if robot_dataset == "kaist":
@@ -519,18 +511,8 @@ class SourceEnvWrapper:
                 else:
                     gripper_open = gripper_convert(gripper_states[pose_index], robot_dataset)
                 for i in range(2):
-                    source_reached = True
                     joint_angle = joint_angles[pose_index]
                     self.source_env.teleport_to_joint_positions(joint_angle)
-                    source_reached_pose = self.source_env.compute_eef_pose()
-                    #source_reached, actual_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=source_reached_pose)
-                    #print(actual_reached_pose)
-                    #target_pose = actual_reached_pose
-                    if not source_reached:
-                        if reference_joint_angles_path is not None:
-                            print("Source robot failed to reach the desired pose")
-                        else:
-                            continue
                     if type(gripper_open) is bool:
                         self.source_env.open_close_gripper(gripper_open=gripper_open)
                     else:
@@ -539,26 +521,15 @@ class SourceEnvWrapper:
                     target_pose = self.source_env.compute_eef_pose()
 
             gripper_list.append(gripper_open)
-            target_pose_list.append(target_pose)
-                
-            source_robot_img, source_robot_seg_img = self.source_env.get_observation(white_background=True)
-                
-            source_robot_img_brightness_augmented = change_brightness(source_robot_img, value=np.random.randint(-40, 40), mask=source_robot_seg_img)
-            #print(f"\033[32m[NOTICE] 已完成第{pose_index}/{num_robot_poses}个pose的生成\033[0m")
-            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name}_rgb", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(source_robot_img, cv2.COLOR_RGB2BGR))
-            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name}_rgb_brightness_augmented", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(source_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
-            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{source_name}_mask", f"{episode}/{pose_index}.jpg"), source_robot_seg_img * 255)
-        
+            target_pose_list.append(target_pose)       
         target_pose_array = np.vstack(target_pose_list)
         gripper_array = np.vstack(gripper_list)
         eef_npy_path = os.path.join(
-            save_paired_images_folder_path, f"{self.source_name}_eef_states_{episode}.npy"
+            save_source_robot_states_path, f"{self.source_name}_eef_states_{episode}.npy"
         )
         np.save(eef_npy_path, target_pose_array)
-        npz_path = os.path.join(save_paired_images_folder_path, f"{episode}.npz")
+        npz_path = os.path.join(save_source_robot_states_path, f"{episode}.npz")
         np.savez(npz_path, pos=target_pose_array, grip=gripper_array, camera=camera_reference_pose, fov=fov)
-
-
         
 
 
@@ -597,11 +568,7 @@ if __name__ == "__main__":
         source_name = "Panda"
         source_gripper = "PandaGripper"
 
-    save_paired_images_folder_path = os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/paired_images", args.robot_dataset)
-    os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name}_rgb", str(args.episode)), exist_ok=True)
-    os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name}_rgb_brightness_augmented", str(args.episode)), exist_ok=True)
-    os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name}_mask", str(args.episode)), exist_ok=True)
-    
+    save_source_robot_states_path = os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/paired_images", args.robot_dataset)
     
     if args.robot_dataset is not None:
         from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
@@ -613,8 +580,8 @@ if __name__ == "__main__":
         camera_width = 256
     
     source_env = SourceEnvWrapper(source_name, source_gripper, args.robot_dataset, camera_height, camera_width, verbose=args.verbose)
-    source_env.generate_image(
-        save_paired_images_folder_path=save_paired_images_folder_path, 
+    source_env.get_source_robot_states(
+        save_source_robot_states_path=save_source_robot_states_path, 
         reference_joint_angles_path=args.reference_joint_angles_path, 
         reference_ee_states_path=args.reference_ee_states_path, 
         reference_gripper_states_path=args.reference_gripper_states_path,

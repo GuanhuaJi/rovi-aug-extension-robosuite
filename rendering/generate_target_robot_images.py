@@ -10,7 +10,7 @@ import robosuite as suite
 import robosuite.macros as macros
 macros.IMAGE_CONVENTION = "opencv"
 
-from test_server import RobotCameraWrapper, change_brightness
+from export_source_robot_states import RobotCameraWrapper, change_brightness
 from robot_pose_dict import ROBOT_POSE_DICT
 from tqdm import tqdm
 

@@ -13,12 +13,12 @@ def main():
     env["CUDA_VISIBLE_DEVICES"] = "0"
 
     # Loop through episodes 0 to 19
-    for episode in range(0, 1):
+    for episode in range(0, 6):
         print(f"Processing episode {episode}...")
         # 1. Run test_server.py
         if regenerate is False:
             subprocess.run([
-                "python", "test_server.py",
+                "python", "export_source_robot_states.py",
                 "--robot_dataset", robot_dataset,
                 "--episode", str(episode)
             ], env=env, check=True)
@@ -27,7 +27,7 @@ def main():
         for target_robot in ["Panda", "IIWA", "Sawyer", "Jaco", "UR5e", "Kinova3"]:
         #for target_robot in ["Panda"]:
             subprocess.run([
-                "python", "test_client.py",
+                "python", "generate_target_robot_images.py",
                 "--robot_dataset", robot_dataset,
                 "--target_robot", target_robot,
                 "--episode", str(episode)
