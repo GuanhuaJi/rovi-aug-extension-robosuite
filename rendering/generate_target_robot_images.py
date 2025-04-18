@@ -17,6 +17,19 @@ from tqdm import tqdm
 
 from transforms3d.quaternions import quat2mat
 
+import json
+from pathlib import Path
+
+def load_blacklist(blacklist_path) -> dict:
+    if blacklist_path.exists() and blacklist_path.stat().st_size > 0:
+        with blacklist_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}                      # start empty the first time
+
+def save_blacklist(blacklist_path, blk: dict) -> None:
+    with blacklist_path.open("w", encoding="utf-8") as f:
+        json.dump(blk, f, indent=2)
+
 def offset_in_quaternion_direction_batch(positions, quaternions, offset_dist=0.05, local_direction=None):
     """
     批量处理:
@@ -106,7 +119,19 @@ class TargetEnvWrapper:
             self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
             target_reached, target_reached_pose = self.target_env.drive_robot_to_target_pose(target_pose=target_pose)
             if not target_reached:
-                print("Target does not reach")
+                blacklist_path = Path(os.path.join(save_paired_images_folder_path, "blacklist.json"))
+                blk = load_blacklist(blacklist_path)
+                print(blacklist_path)
+                robot_list = blk.get(self.target_name, [])
+                if episode not in robot_list:
+                    robot_list.append(episode)
+                    robot_list.sort()
+                    blk[self.target_name] = robot_list
+                    save_blacklist(blacklist_path, blk)
+                    RED   = "\033[91m"   # bright red
+                    RESET = "\033[0m"
+                    print(f"{RED}[BLACKLIST] Added {self.target_name} – episode {episode}{RESET}")
+                break
             ppose = self.target_env.compute_eef_pose()[:3] + ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
             #print(ppose)
             target_pose_list.append(ppose)
@@ -155,8 +180,8 @@ if __name__ == "__main__":
     """
 
     # print welcome info
-    print("Welcome to robosuite v{}!".format(suite.__version__))
-    print(suite.__logo__)
+    # print("Welcome to robosuite v{}!".format(suite.__version__))
+    # print(suite.__logo__)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=0, help="(optional) (optional) set seed")

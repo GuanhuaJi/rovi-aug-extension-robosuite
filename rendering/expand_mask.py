@@ -111,7 +111,8 @@ def main(input_folder, output_folder, alpha, use_8_connected):
         # 自适应扩展（快速多源 BFS 实现）
         expanded = adaptive_expand_mask_fast(mask_binary, alpha=alpha, use_8_connected=use_8_connected)
         cv2.imwrite(out_path, expanded)
-        print(f"处理完成: {file_name} -> {out_path}")
+        #print(f"处理完成: {file_name} -> {out_path}")
+    print(f"expand_mask处理完成: {output_folder}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Adaptive mask expansion script.")

@@ -52,7 +52,7 @@ def process_folder(input_folder, output_folder, min_size=50):
         return
 
     for file_path in image_files:
-        print(f"处理 {file_path} ...")
+        #print(f"处理 {file_path} ...")
         # 以灰度模式读取图像
         mask = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
         if mask is None:
@@ -71,9 +71,8 @@ def process_folder(input_folder, output_folder, min_size=50):
         
         # 保存处理后的图像
         cv2.imwrite(output_path, cleaned_mask)
-        print(f"保存到 {output_path}")
     
-    print("所有文件处理完成！")
+    print(f"Remove small points处理完成：{output_folder}")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(

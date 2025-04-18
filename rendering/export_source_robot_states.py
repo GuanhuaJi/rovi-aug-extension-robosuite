@@ -499,7 +499,7 @@ class SourceEnvWrapper:
         target_pose_list = []
         gripper_list = []
 
-        for pose_index in tqdm(range(num_robot_poses), desc=f'{self.source_name} Pose Generation'):    
+        for pose_index in tqdm(range(num_robot_poses), desc=f'{self.source_name} Pose States Calculation'):    
             source_reached = False
             attempt_counter = 0
             while source_reached == False:
@@ -527,9 +527,14 @@ class SourceEnvWrapper:
         eef_npy_path = os.path.join(
             save_source_robot_states_path, f"{self.source_name}_eef_states_{episode}.npy"
         )
+        GREEN = "\033[92m"
+        RESET = "\033[0m"
         np.save(eef_npy_path, target_pose_array)
+        print(f"{GREEN}✔ End effector saved under {eef_npy_path}{RESET}")
         npz_path = os.path.join(save_source_robot_states_path, f"{episode}.npz")
         np.savez(npz_path, pos=target_pose_array, grip=gripper_array, camera=camera_reference_pose, fov=fov)
+        print(f"{GREEN}✔ States saved under {npz_path}{RESET}")
+
         
 
 
@@ -546,8 +551,8 @@ if __name__ == "__main__":
     """
 
     # print welcome info
-    print("Welcome to robosuite v{}!".format(suite.__version__))
-    print(suite.__logo__)
+    #print("Welcome to robosuite v{}!".format(suite.__version__))
+    #print(suite.__logo__)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=0, help="(optional) set seed")
