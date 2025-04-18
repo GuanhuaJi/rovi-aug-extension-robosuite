@@ -313,7 +313,7 @@ class RobotCameraWrapper:
     def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.006, num_iter_max=100):
         # breakpoint()
         # reset robot joint positions so the robot is hopefully not in a weird pose
-        self.set_robot_joint_positions()
+        #self.set_robot_joint_positions()
         self.env.robots[0].controller.use_delta = False # change to absolute pose for setting the initial state
         
         assert len(target_pose) == 7, "Target pose should be 7DOF"
@@ -519,12 +519,13 @@ class SourceEnvWrapper:
                 else:
                     gripper_open = gripper_convert(gripper_states[pose_index], robot_dataset)
                 for i in range(2):
-                    source_reached = False
+                    source_reached = True
                     joint_angle = joint_angles[pose_index]
                     self.source_env.teleport_to_joint_positions(joint_angle)
                     source_reached_pose = self.source_env.compute_eef_pose()
-                    source_reached, actual_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=source_reached_pose)
-                    target_pose = actual_reached_pose
+                    #source_reached, actual_reached_pose = self.source_env.drive_robot_to_target_pose(target_pose=source_reached_pose)
+                    #print(actual_reached_pose)
+                    #target_pose = actual_reached_pose
                     if not source_reached:
                         if reference_joint_angles_path is not None:
                             print("Source robot failed to reach the desired pose")

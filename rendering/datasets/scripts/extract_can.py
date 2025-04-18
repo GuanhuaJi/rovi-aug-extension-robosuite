@@ -5,6 +5,7 @@ from PIL import Image
 
 def main():
     hdf5_path = "/home/jiguanhua/mirage/robot2robot/image84/can/image_84.hdf5"
+    demokey_pairing = []
 
     with h5py.File(hdf5_path, "r") as f:
         data_group = f["data"]
@@ -12,7 +13,10 @@ def main():
 
         for i, demo_key in enumerate(demo_keys):
             print(f"[INFO] Processing {demo_key} as episode_{i}")
+            demokey_pairing.append(int(demo_key.split('_')[1]))
+
             demo_group = data_group[demo_key]
+
 
             # --- 1) Access observations ---
             obs_group = demo_group["obs"]
@@ -25,7 +29,7 @@ def main():
             # Gripper state (T, 2)
             robot0_gripper_qpos = obs_group["robot0_gripper_qpos"][:]
             # Camera frames (T, H, W, 3)
-            agentview_images = obs_group["agentview_image"][:]  
+            agentview_images = obs_group["agentview_image_sawyer"][:]  
 
             # Combine EEF pos+quat to one array (T, 7), if desired
             ee_states = np.concatenate([robot0_eef_pos, robot0_eef_quat], axis=-1)
@@ -36,7 +40,7 @@ def main():
             os.makedirs(episode_path, exist_ok=True)
 
             # Create an "images" subfolder
-            images_folder = os.path.join(episode_path, "images")
+            images_folder = os.path.join(episode_path, "images_sawyer")
             os.makedirs(images_folder, exist_ok=True)
 
             # --- 3) Save each frame as .jpeg ---
@@ -54,6 +58,7 @@ def main():
             np.savetxt(os.path.join(episode_path, "gripper_states.txt"), robot0_gripper_qpos)
 
             print(f"[INFO] episode_{i} saved with {robot0_joint_pos.shape[0]} timesteps.")
+        print(demokey_pairing)
 
 if __name__ == "__main__":
     main()
