@@ -1,14 +1,17 @@
 # conda activate mirage
-# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "lift" --target_robot "Panda"
-# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "lift" --target_robot "IIWA"
-# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "lift" --target_robot "Sawyer"
-# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "lift" --target_robot "Jaco"
-# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "lift" --target_robot "UR5e"
-# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "lift" --target_robot "Kinova3"
+# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "square" --target_robot "Panda"
+# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "square" --target_robot "IIWA"
+# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "square" --target_robot "Sawyer"
+# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "square" --target_robot "Jaco"
+# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "square" --target_robot "UR5e"
+# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "square" --target_robot "Kinova3"
+# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "square" --blacklist True
 
 import os
 import subprocess
 import argparse
+import json
+from pathlib import Path
 
 def generate_mask(robot_dataset, source_robot, episode, env):
     input_folder = f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{robot_dataset}/{source_robot}_mask/{episode}"
@@ -31,7 +34,17 @@ def generate_mask(robot_dataset, source_robot, episode, env):
         "--use_8_connected"
     ], env=env, check=True)
 
-def main(robot_dataset, target_robot):
+def load_blacklist(blacklist_path) -> dict:
+    if blacklist_path.exists() and blacklist_path.stat().st_size > 0:
+        with blacklist_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}                      # start empty the first time
+
+def save_blacklist(blacklist_path, blk: dict) -> None:
+    with blacklist_path.open("w", encoding="utf-8") as f:
+        json.dump(blk, f, indent=2)
+
+def main(robot_dataset, target_robot, blacklist):
     source_robot = "Panda"
     regenerate = target_robot in ["Panda", "IIWA", "Sawyer", "Jaco", "UR5e", "Kinova3"]
 
@@ -40,41 +53,71 @@ def main(robot_dataset, target_robot):
     env["CUDA_VISIBLE_DEVICES"] = "0"
 
     # Loop through episodes 0 to 19
-    for episode in range(0, 200):
-        print(f"Processing episode {episode}...")
-        # 1. Run test_server.py
-        if regenerate is False:
-            subprocess.run([
-                "python", "/home/jiguanhua/mirage/robot2robot/rendering/export_source_robot_states.py",
-                "--robot_dataset", robot_dataset,
-                "--episode", str(episode)
-            ], env=env, check=True)
-
-        # 2. Run test_client.py for each target robot
-        if target_robot is None:
-            for target_robot in ["Panda", "IIWA", "Sawyer", "Jaco", "UR5e", "Kinova3"]:
-            #for target_robot in ["Panda"]:
+    if blacklist:
+        blacklist_path = Path(f"/home/jiguanhua/mirage/robot2robot/rendering/paired_images/{robot_dataset}/blacklist.json")
+        if target_robot in ["Panda", "IIWA", "Sawyer", "Jaco", "UR5e", "Kinova3"]:
+            blacklist_dict = load_blacklist(blacklist_path)
+            episodes = blacklist_dict.get(target_robot, [])
+            blacklist_dict[target_robot] = []
+            save_blacklist(blacklist_path, blacklist_dict)
+            for episode in episodes:
                 subprocess.run([
                     "python", "/home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py",
                     "--robot_dataset", robot_dataset,
                     "--target_robot", target_robot,
                     "--episode", str(episode)
                 ], env=env, check=True)
-            generate_mask(robot_dataset, source_robot, episode, env)
-        elif target_robot in ["Panda", "IIWA", "Sawyer", "Jaco", "UR5e", "Kinova3"]:
-            subprocess.run([
-                "python", "/home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py",
-                "--robot_dataset", robot_dataset,
-                "--target_robot", target_robot,
-                "--episode", str(episode)
-            ], env=env, check=True)
-            if target_robot == "Panda":
+        else:
+            for robot_dataset, episodes in blacklist_dict.items():
+                blacklist_dict = load_blacklist(blacklist_path)
+                episodes = blacklist_dict.get(target_robot, [])
+                blacklist_dict[target_robot] = []
+                save_blacklist(blacklist_path, blacklist_dict)
+                for episode in episode:
+                    subprocess.run([
+                        "python", "/home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py",
+                        "--robot_dataset", robot_dataset,
+                        "--target_robot", target_robot,
+                        "--episode", str(episode)
+                    ], env=env, check=True)
+
+    else:
+        for episode in range(72, 200):
+            print(f"Processing episode {episode}...")
+            # 1. Run test_server.py
+            if regenerate is False:
+                subprocess.run([
+                    "python", "/home/jiguanhua/mirage/robot2robot/rendering/export_source_robot_states.py",
+                    "--robot_dataset", robot_dataset,
+                    "--episode", str(episode)
+                ], env=env, check=True)
+
+            # 2. Run test_client.py for each target robot
+            if target_robot is None:
+                for target_robot in ["Panda", "IIWA", "Sawyer", "Jaco", "UR5e", "Kinova3"]:
+                #for target_robot in ["Panda"]:
+                    subprocess.run([
+                        "python", "/home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py",
+                        "--robot_dataset", robot_dataset,
+                        "--target_robot", target_robot,
+                        "--episode", str(episode)
+                    ], env=env, check=True)
                 generate_mask(robot_dataset, source_robot, episode, env)
-        print(f"Completed episode {episode}.\n")
+            elif target_robot in ["Panda", "IIWA", "Sawyer", "Jaco", "UR5e", "Kinova3"]:
+                subprocess.run([
+                    "python", "/home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py",
+                    "--robot_dataset", robot_dataset,
+                    "--target_robot", target_robot,
+                    "--episode", str(episode)
+                ], env=env, check=True)
+                if target_robot == "Panda":
+                    generate_mask(robot_dataset, source_robot, episode, env)
+            print(f"Completed episode {episode}.\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--target_robot", type=str, default=None)
     parser.add_argument("--robot_dataset", type=str, default=None)
+    parser.add_argument("--blacklist", type=bool, default=False)
     args = parser.parse_args()
-    main(args.robot_dataset, args.target_robot)
+    main(args.robot_dataset, args.target_robot, args.blacklist)

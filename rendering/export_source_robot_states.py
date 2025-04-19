@@ -513,11 +513,14 @@ class SourceEnvWrapper:
                 for i in range(2):
                     joint_angle = joint_angles[pose_index]
                     self.source_env.teleport_to_joint_positions(joint_angle)
+                    '''
                     if type(gripper_open) is bool:
                         self.source_env.open_close_gripper(gripper_open=gripper_open)
                     else:
                         self.source_env.set_gripper_joint_positions(gripper_states[pose_index], self.source_name)
                         gripper_open = (gripper_states[pose_index][0] - gripper_states[pose_index][1]) > 0.06
+                    '''
+                    gripper_open = (gripper_states[pose_index][0] - gripper_states[pose_index][1]) > 0.06
                     target_pose = self.source_env.compute_eef_pose()
 
             gripper_list.append(gripper_open)

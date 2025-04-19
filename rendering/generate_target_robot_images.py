@@ -131,7 +131,7 @@ class TargetEnvWrapper:
                     RED   = "\033[91m"   # bright red
                     RESET = "\033[0m"
                     print(f"{RED}[BLACKLIST] Added {self.target_name} – episode {episode}{RESET}")
-                break
+                exit(0)
             ppose = self.target_env.compute_eef_pose()[:3] + ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
             #print(ppose)
             target_pose_list.append(ppose)
