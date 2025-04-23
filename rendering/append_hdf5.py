@@ -7,7 +7,7 @@ from PIL import Image
 # ---------------------------
 # 1. 配置部分：修改为你自己的路径
 # ---------------------------
-dataset = "can"
+dataset = "lift"
 
 
 hdf5_path    = f"/home/jiguanhua/mirage/robot2robot/image84/{dataset}/image_84.hdf5"   # 你已有的HDF5文件路径
@@ -16,6 +16,7 @@ path_iiwa     = f"/home/jiguanhua/mirage/robot2robot/rendering/cross_inpainting/
 path_jaco   = f"/home/jiguanhua/mirage/robot2robot/rendering/cross_inpainting/{dataset}_Jaco"
 path_ur5e   = f"/home/jiguanhua/mirage/robot2robot/rendering/cross_inpainting/{dataset}_UR5e"
 path_kinova3   = f"/home/jiguanhua/mirage/robot2robot/rendering/cross_inpainting/{dataset}_Kinova3"
+path_panda  = f"/home/jiguanhua/mirage/robot2robot/rendering/cross_inpainting/{dataset}_Panda"
 
 num_episodes = 200  # 你有多少个episode，或你想循环到多少
 
@@ -113,7 +114,7 @@ with h5py.File(hdf5_path, "a") as f:  # 以 'a' 模式打开，允许写入
     panda_eef_dict  = load_eef_states_into_dict(path_eef,  "Panda")
     ur5e_eef_dict  = load_eef_states_into_dict(path_eef,  "UR5e")
     kinova3_eef_dict = load_eef_states_into_dict(path_eef, "Kinova3")
-    for episode_id in range(num_episodes):
+    for episode_id in range(0, 200):
         # 3.1 找到 HDF5 中 /data/demo_{episode_id}/obs 这个 group
         group_path = f"data/demo_{demokey_pairing[episode_id]}/obs"
         if group_path not in f:
@@ -127,15 +128,19 @@ with h5py.File(hdf5_path, "a") as f:  # 以 'a' 模式打开，允许写入
         jaco_folder  = os.path.join(path_jaco,  str(episode_id))
         ur5e_folder  = os.path.join(path_ur5e,  str(episode_id))
         kinova3_folder = os.path.join(path_kinova3, str(episode_id))
+        panda_folder  = os.path.join(path_panda, str(episode_id))
+
         
         sawyer_data = load_images_as_array(sawyer_folder)
         iiwa_data    = load_images_as_array(iiwa_folder)
         jaco_data  = load_images_as_array(jaco_folder)
         ur5e_data  = load_images_as_array(ur5e_folder)
         kinova3_data = load_images_as_array(kinova3_folder)
+        panda_data  = load_images_as_array(panda_folder)
+
         
         # 如果某个文件夹为空或不存在，你要么跳过，要么给个警告
-        if (sawyer_data is None) or (iiwa_data is None) or (jaco_data is None) or (ur5e_data is None) or (kinova3_data is None):
+        if (sawyer_data is None) or (iiwa_data is None) or (jaco_data is None) or (ur5e_data is None) or (kinova3_data is None) or (panda_data is None):
             print(f"警告：Episode {demokey_pairing[episode_id]} 四类视角中有数据加载失败，跳过创建。")
             continue
         
@@ -150,6 +155,8 @@ with h5py.File(hdf5_path, "a") as f:  # 以 'a' 模式打开，允许写入
             del obs_group["agentview_image_ur5e"]
         if "agentview_image_kinova3" in obs_group:
             del obs_group["agentview_image_kinova3"]
+        if "agentview_image_panda" in obs_group:
+            del obs_group["agentview_image_panda"]
         
         # 3.4 创建新的 dataset
         #    可以考虑 compression、chunks 等参数，示例如下：
@@ -184,6 +191,13 @@ with h5py.File(hdf5_path, "a") as f:  # 以 'a' 模式打开，允许写入
         obs_group.create_dataset(
             "agentview_image_kinova3", 
             data=kinova3_data,
+            compression="gzip",
+            compression_opts=4,
+            chunks=True
+        )
+        obs_group.create_dataset(
+            "agentview_image_panda", 
+            data=panda_data,
             compression="gzip",
             compression_opts=4,
             chunks=True
@@ -240,7 +254,7 @@ with h5py.File(hdf5_path, "a") as f:  # 以 'a' 模式打开，允许写入
                 chunks=True
             )
         
-        if episode_id in ur5e_eef_dict:
+        if episode_id in kinova3_eef_dict:
             kinova3_eef_arr = kinova3_eef_dict[episode_id]
             if "Kinova3_eef_states" in obs_group:
                 del obs_group["Kinova3_eef_states"]

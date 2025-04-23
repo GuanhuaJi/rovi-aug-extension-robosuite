@@ -633,10 +633,12 @@ class SourceEnvWrapper:
         joint_angles, ee_states, gripper_states = self._load_dataset_files(info, robot_dataset)
         num_frames = joint_angles.shape[0]
         idxs = [
+            0,
             num_frames * 1 // 5,
             num_frames * 2 // 5,
             num_frames * 3 // 5,
-            num_frames * 4 // 5
+            num_frames * 4 // 5,
+            num_frames - 1
         ]
         print("选取的4个帧下标:", idxs)
 
@@ -687,7 +689,7 @@ class SourceEnvWrapper:
                     cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_mask", f"{idx}/{counter}.jpg"), source_robot_seg_img * 255)
                     
                     img2 = Image.open(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb", f"{idx}/{counter}.jpg")).convert("RGBA")
-                    img1 = Image.open(f"./datasets/states/{robot_dataset}/episode_4/images/{idx}.jpeg").convert("RGBA")
+                    img1 = Image.open(f"./datasets/states/{robot_dataset}/episode_0/images/{idx}.jpeg").convert("RGBA")
 
                     if img1.size != img2.size:
                         img2 = img2.resize(img1.size)

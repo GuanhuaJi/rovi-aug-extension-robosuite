@@ -82,7 +82,7 @@ def main(robot_dataset, target_robot, blacklist):
                     ], env=env, check=True)
 
     else:
-        for episode in range(72, 200):
+        for episode in range(185, 200):
             print(f"Processing episode {episode}...")
             # 1. Run test_server.py
             if regenerate is False:
