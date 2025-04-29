@@ -16,8 +16,11 @@ macros.IMAGE_CONVENTION = "opencv"
 from scipy.spatial.transform import Rotation as R
 from tqdm import tqdm
 from robot_pose_dict import ROBOT_POSE_DICT
+from pathlib import Path
 
 np.set_printoptions(suppress=True, precision=6)
+
+# python /home/jiguanhua/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset stack
 
 def gripper_convert(gripper_state_value, robot_type):
     if robot_type == "autolab_ur5":
@@ -45,6 +48,10 @@ def gripper_convert(gripper_state_value, robot_type):
     elif robot_type == "lift":
         return gripper_state_value
     elif robot_type == "square":
+        return gripper_state_value
+    elif robot_type == "stack":
+        return gripper_state_value
+    elif robot_type == "three_piece_assembly":
         return gripper_state_value
     print("UNKNOWN GRIPPER")
     return None
@@ -273,7 +280,7 @@ class RobotCameraWrapper:
         
         print(robotname)
         from robot_pose_dict import ROBOT_POSE_DICT
-        self.some_safe_joint_angles = ROBOT_POSE_DICT[robot_dataset][robotname]['safe_angle']
+        #self.some_safe_joint_angles = ROBOT_POSE_DICT[robot_dataset][robotname]['safe_angle']
         '''
         if robotname == "Panda":
             self.some_safe_joint_angles = [-0.6102706193923950195, -1.455744981765747070, 1.501405358314514160, -2.240571022033691406, -0.2229462265968322754, 2.963621616363525391, -0.5898305177688598633]
@@ -310,7 +317,7 @@ class RobotCameraWrapper:
             self.env.sim.data.qvel[qpos_addr] = 0.0
         self.env.sim.forward()
 
-    def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.006, num_iter_max=100):
+    def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.006, num_iter_max=200):
         # breakpoint()
         # reset robot joint positions so the robot is hopefully not in a weird pose
         #self.set_robot_joint_positions()
@@ -382,9 +389,7 @@ class RobotCameraWrapper:
         if not gripper_open:
             action[-1] = 1
         else:
-            action[-1] = -1
-        # for _ in range(10):            
-        #     obs, _, _, _ = self.env.step(action)
+            action[-1] = -1            
         obs, _, _, _ = self.env.step(action)
     
     def update_camera(self):
@@ -398,12 +403,10 @@ class RobotCameraWrapper:
         obs = self.env._get_observations()
         rgb_img_raw = obs[f'{view}_image']
         seg_img = obs[f'{view}_segmentation_robot_only']
-        # count the number of robot pixels
         num_robot_pixels = np.sum(seg_img)
         #if num_robot_pixels <= 700:
             #print(num_robot_pixels, " robot pixels in the image")
             #return None, None
-        
         # Create a mask where non-robot pixels are set to 0 and robot pixels are set to 1
         if white_background:
             mask = (np.repeat(seg_img, 3, axis=2)).astype(bool)
@@ -463,80 +466,89 @@ class SourceEnvWrapper:
         gripper_states = np.loadtxt(gripper_states_path)
         return joint_angles, ee_states, gripper_states
     
-    def get_source_robot_states(self, save_source_robot_states_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, reference_gripper_states_path=None, robot_dataset=None, episode=0):
-        info = self._load_dataset_info(robot_dataset)
-        joint_angles = np.loadtxt(os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "joint_states.txt"))
-        gripper_states = np.loadtxt(os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "gripper_states.txt"))
-        if robot_dataset == "toto":
-            joint_angles[:, 5] += 3.14159 / 2
-            joint_angles[:, 6] += 3.14159 / 4
-        if robot_dataset == "autolab_ur5":
-            joint_angles[:, 5] += 3.14159 / 2
-        num_robot_poses = joint_angles.shape[0]
+    def get_source_robot_states(self, save_source_robot_states_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, reference_gripper_states_path=None, robot_dataset=None):
+        for episode in range(0, 1000):
+            info = self._load_dataset_info(robot_dataset)
+            joint_angles = np.loadtxt(os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "joint_states.txt"))
+            gripper_states = np.loadtxt(os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "gripper_states.txt"))
+            if robot_dataset == "toto":
+                joint_angles[:, 5] += 3.14159 / 2
+                joint_angles[:, 6] += 3.14159 / 4
+            if robot_dataset == "autolab_ur5":
+                joint_angles[:, 5] += 3.14159 / 2
+            num_robot_poses = joint_angles.shape[0]
 
-        if robot_dataset == "can":
-            camera_reference_pose = np.array([0.9, 0.1, 1.75, 0.271, 0.271, 0.653, 0.653])
-            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
-            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
-        elif robot_dataset == "lift":
-            camera_reference_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
-            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
-            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
-        elif robot_dataset == "square":
-            camera_reference_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
-            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
-            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
-        else:
-            camera_reference_position = info["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
-            roll_deg = info["roll"]
-            pitch_deg = info["pitch"]
-            yaw_deg = info["yaw"]
-            fov = info["camera_fov"]
-            r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
-            camera_reference_quaternion = r.as_quat()
-            camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
+            if robot_dataset == "can":
+                camera_reference_pose = np.array([0.9, 0.1, 1.75, 0.271, 0.271, 0.653, 0.653])
+                cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+                fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+            elif robot_dataset == "lift":
+                camera_reference_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+                cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+                fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+            elif robot_dataset == "square":
+                camera_reference_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+                cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+                fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+            elif robot_dataset == "stack":
+                camera_reference_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+                cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+                fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+            elif robot_dataset == "three_piece_assembly":
+                camera_reference_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+                cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+                fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+            else:
+                camera_reference_position = info["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
+                roll_deg = info["roll"]
+                pitch_deg = info["pitch"]
+                yaw_deg = info["yaw"]
+                fov = info["camera_fov"]
+                r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
+                camera_reference_quaternion = r.as_quat()
+                camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
 
-        target_pose_list = []
-        gripper_list = []
+            target_pose_list = []
+            gripper_list = []
 
-        for pose_index in tqdm(range(num_robot_poses), desc=f'{self.source_name} Pose States Calculation'):    
-            source_reached = False
-            attempt_counter = 0
-            while source_reached == False:
-                attempt_counter += 1
-                if attempt_counter > 10:
-                    break
-                if robot_dataset == "kaist":
-                    gripper_open = False
-                else:
-                    gripper_open = gripper_convert(gripper_states[pose_index], robot_dataset)
-                for i in range(2):
-                    joint_angle = joint_angles[pose_index]
-                    self.source_env.teleport_to_joint_positions(joint_angle)
-                    '''
-                    if type(gripper_open) is bool:
-                        self.source_env.open_close_gripper(gripper_open=gripper_open)
+            for pose_index in tqdm(range(num_robot_poses), desc=f'{self.source_name} Pose States Calculation'):    
+                source_reached = False
+                attempt_counter = 0
+                while source_reached == False:
+                    attempt_counter += 1
+                    if attempt_counter > 10:
+                        break
+                    if robot_dataset == "kaist":
+                        gripper_open = False
                     else:
-                        self.source_env.set_gripper_joint_positions(gripper_states[pose_index], self.source_name)
+                        gripper_open = gripper_convert(gripper_states[pose_index], robot_dataset)
+                    for i in range(2):
+                        joint_angle = joint_angles[pose_index]
+                        self.source_env.teleport_to_joint_positions(joint_angle)
+                        '''
+                        if type(gripper_open) is bool:
+                            self.source_env.open_close_gripper(gripper_open=gripper_open)
+                        else:
+                            self.source_env.set_gripper_joint_positions(gripper_states[pose_index], self.source_name)
+                            gripper_open = (gripper_states[pose_index][0] - gripper_states[pose_index][1]) > 0.06
+                        '''
                         gripper_open = (gripper_states[pose_index][0] - gripper_states[pose_index][1]) > 0.06
-                    '''
-                    gripper_open = (gripper_states[pose_index][0] - gripper_states[pose_index][1]) > 0.06
-                    target_pose = self.source_env.compute_eef_pose()
+                        target_pose = self.source_env.compute_eef_pose()
 
-            gripper_list.append(gripper_open)
-            target_pose_list.append(target_pose)       
-        target_pose_array = np.vstack(target_pose_list)
-        gripper_array = np.vstack(gripper_list)
-        eef_npy_path = os.path.join(
-            save_source_robot_states_path, f"{self.source_name}_eef_states_{episode}.npy"
-        )
-        GREEN = "\033[92m"
-        RESET = "\033[0m"
-        np.save(eef_npy_path, target_pose_array)
-        print(f"{GREEN}✔ End effector saved under {eef_npy_path}{RESET}")
-        npz_path = os.path.join(save_source_robot_states_path, f"{episode}.npz")
-        np.savez(npz_path, pos=target_pose_array, grip=gripper_array, camera=camera_reference_pose, fov=fov)
-        print(f"{GREEN}✔ States saved under {npz_path}{RESET}")
+                gripper_list.append(gripper_open)
+                target_pose_list.append(target_pose)       
+            target_pose_array = np.vstack(target_pose_list)
+            gripper_array = np.vstack(gripper_list)
+            eef_npy_path = os.path.join(
+                save_source_robot_states_path, f"{self.source_name}_eef_states_{episode}.npy"
+            )
+            GREEN = "\033[92m"
+            RESET = "\033[0m"
+            np.save(eef_npy_path, target_pose_array)
+            print(f"{GREEN}✔ End effector saved under {eef_npy_path}{RESET}")
+            npz_path = os.path.join(save_source_robot_states_path, f"{episode}.npz")
+            np.savez(npz_path, pos=target_pose_array, grip=gripper_array, camera=camera_reference_pose, fov=fov)
+            print(f"{GREEN}✔ States saved under {npz_path}{RESET}")
 
         
 
@@ -566,7 +578,6 @@ if __name__ == "__main__":
     parser.add_argument("--reference_ee_states_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the ee state file (np.savetxt)")
     parser.add_argument("--reference_gripper_states_path", type=str, help="(optional) to match the gripper's open/close status")
     parser.add_argument("--verbose", action='store_true', help="If set, prints extra debug/warning information")
-    parser.add_argument("--episode", type=int, default=0, help="episode number")
     args = parser.parse_args()
 
     if args.robot_dataset == "autolab_ur5" or args.robot_dataset == "asu_table_top_rlds":
@@ -576,7 +587,8 @@ if __name__ == "__main__":
         source_name = "Panda"
         source_gripper = "PandaGripper"
 
-    save_source_robot_states_path = os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/paired_images", args.robot_dataset)
+    save_source_robot_states_path = (Path("/home/jiguanhua/mirage/robot2robot/rendering/paired_images") / args.robot_dataset / "source_robot_states")
+    save_source_robot_states_path.mkdir(parents=True, exist_ok=True)
     
     if args.robot_dataset is not None:
         from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
@@ -594,7 +606,6 @@ if __name__ == "__main__":
         reference_ee_states_path=args.reference_ee_states_path, 
         reference_gripper_states_path=args.reference_gripper_states_path,
         robot_dataset=args.robot_dataset,
-        episode=args.episode
     )
 
     source_env.source_env.env.close_renderer()

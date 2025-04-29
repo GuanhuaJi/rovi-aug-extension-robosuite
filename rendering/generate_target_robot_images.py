@@ -1,3 +1,6 @@
+# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "stack" --target_robot "Sawyer"
+# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "stack" --target_robot "Panda"
+
 import argparse
 import json
 import time
@@ -19,6 +22,15 @@ from transforms3d.quaternions import quat2mat
 
 import json
 from pathlib import Path
+
+GRIPPER_OPEN = {
+    "Panda": [-2, -10],
+    "IIWA": [10, -10],
+    "Sawyer": [10, -10],
+    "Jaco": [10, -10],
+    "UR5e": [5, -5],
+    "Kinova3": [5, -5],
+}
 
 def load_blacklist(blacklist_path) -> dict:
     if blacklist_path.exists() and blacklist_path.stat().st_size > 0:
@@ -79,91 +91,91 @@ class TargetEnvWrapper:
     
     
     def generate_image(self, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, robot_dataset=None, episode=0):
-        npz_path = os.path.join(save_paired_images_folder_path, f"{episode}.npz")
-        data = np.load(npz_path, allow_pickle=True)
-        target_pose_array = data['pos']
-        shift_dist = ROBOT_POSE_DICT[robot_dataset]['offset_dist']
-        target_pose_array[:, :3] = offset_in_quaternion_direction_batch(target_pose_array[:, :3], target_pose_array[:, 3:], shift_dist)
-        gripper_array = data['grip']
-
+        data = np.load(os.path.join(save_paired_images_folder_path, "source_robot_states", f"0.npz"), allow_pickle=True)
         camera_pose = data['camera']
         camera_pose[:3] -= ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
-        # gripper_v = 0.8
-
         self.target_env.camera_wrapper.set_camera_pose(pos=camera_pose[:3], quat=camera_pose[3:])
-
         if "fov" in data:
             fov = data["fov"]
             self.target_env.camera_wrapper.set_camera_fov(fov)
         self.target_env.update_camera()
 
-        num_robot_poses = target_pose_array.shape[0]
-        target_pose_list = []
-        
-        for pose_index in tqdm(range(num_robot_poses), desc=f'{self.target_name} Pose Generation'):
-            '''
-            if pose_index % 30 == 0: # to avoid simulation becoming unstable
-                self.target_env.env.reset()
-            '''
-            target_pose=target_pose_array[pose_index]
-            target_pose[:3] -= ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
-            '''
-            if robot_dataset == "viola" and self.target_name == "Jaco":
-                target_pose[:3] -= np.array([0, 0, 0.1])
-            elif robot_dataset == "austin_mutex" and self.target_name == "Jaco":
-                target_pose[:3] -= np.array([0, 0, 0.1])
-            elif robot_dataset == "nyu_franka" and self.target_name == "Jaco":
-                target_pose[:3] += np.array([-0.1, 0, 0.1])
-            '''
-            #print(gripper_array[pose_index], type(gripper_array[pose_index]))
-            self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
-            target_reached, target_reached_pose = self.target_env.drive_robot_to_target_pose(target_pose=target_pose)
-            if not target_reached:
-                blacklist_path = Path(os.path.join(save_paired_images_folder_path, "blacklist.json"))
-                blk = load_blacklist(blacklist_path)
-                print(blacklist_path)
-                robot_list = blk.get(self.target_name, [])
-                if episode not in robot_list:
-                    robot_list.append(episode)
-                    robot_list.sort()
-                    blk[self.target_name] = robot_list
-                    save_blacklist(blacklist_path, blk)
+        for episode in tqdm(range(0, 1000), desc=f'{self.target_name} Pose Generation'):
+            os.makedirs(os.path.join(save_paired_images_folder_path, "{}_rgb".format(target_name), str(episode)), exist_ok=True)
+            os.makedirs(os.path.join(save_paired_images_folder_path, "{}_rgb_brightness_augmented".format(target_name), str(episode)), exist_ok=True)
+            os.makedirs(os.path.join(save_paired_images_folder_path, "{}_mask".format(target_name), str(episode)), exist_ok=True)
+            gripper_count = 0
+            npz_path = os.path.join(save_paired_images_folder_path, f"{episode}.npz")
+            data = np.load(npz_path, allow_pickle=True)
+            target_pose_array = data['pos']
+            gripper_array = data['grip']
+            num_robot_poses = target_pose_array.shape[0]
+            target_pose_list = []
+            
+            for pose_index in range(num_robot_poses):
+                target_pose=target_pose_array[pose_index]
+                target_pose[:3] -= ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
+                '''
+                if robot_dataset == "viola" and self.target_name == "Jaco":
+                    target_pose[:3] -= np.array([0, 0, 0.1])
+                elif robot_dataset == "austin_mutex" and self.target_name == "Jaco":
+                    target_pose[:3] -= np.array([0, 0, 0.1])
+                elif robot_dataset == "nyu_franka" and self.target_name == "Jaco":
+                    target_pose[:3] += np.array([-0.1, 0, 0.1])
+                '''
+                if gripper_array[pose_index] == False:
+                    if gripper_count < GRIPPER_OPEN[self.target_name][0]:
+                        self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
+                        gripper_count += 1
+                else:
+                    if gripper_count > -GRIPPER_OPEN[self.target_name][1]:
+                        self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
+                        gripper_count -= 1
+                
+                target_reached, target_reached_pose = self.target_env.drive_robot_to_target_pose(target_pose=target_pose)
+                if not target_reached:
+                    blacklist_path = Path(os.path.join(save_paired_images_folder_path, "blacklist.json"))
+                    blk = load_blacklist(blacklist_path)
+                    print(blacklist_path)
+                    robot_list = blk.get(self.target_name, [])
+                    if episode not in robot_list:
+                        robot_list.append(episode)
+                        robot_list.sort()
+                        blk[self.target_name] = robot_list
+                        save_blacklist(blacklist_path, blk)
                     RED   = "\033[91m"   # bright red
                     RESET = "\033[0m"
                     print(f"{RED}[BLACKLIST] Added {self.target_name} – episode {episode}{RESET}")
-                exit(0)
-            ppose = self.target_env.compute_eef_pose()[:3] + ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
-            #print(ppose)
-            target_pose_list.append(ppose)
+                    break
+                ppose = self.target_env.compute_eef_pose()[:3] + ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
+                target_pose_list.append(ppose)
+                #print("TARGET_REACHED_POSE:", ppose)
+                
+                
+                '''
+                if robot_dataset == "viola" and self.target_name == "Jaco":
+                    camera_pose[:3] -= np.array([0, 0, 0.1])
+                elif robot_dataset == "austin_mutex" and self.target_name == "Jaco":
+                    camera_pose[:3] -= np.array([0, 0, 0.1])
+                elif robot_dataset == "nyu_franka" and self.target_name == "Jaco":
+                    camera_pose[:3] += np.array([-0.1, 0, 0.1])
+                '''
+                
+                #joint_indices = self.target_env.env.robots[0]._ref_joint_pos_indexes
+                #current_joint_angles = self.target_env.env.sim.data.qpos[joint_indices]
 
-            #print("TARGET_REACHED_POSE:", ppose)
+                target_robot_img, target_robot_seg_img = self.target_env.get_observation(white_background=True)
+                #target_robot_img_brightness_augmented = change_brightness(target_robot_img, value=np.random.randint(-40, 40), mask=target_robot_seg_img)
+                #target_robot_img_brightness_augmented = cv2.resize(target_robot_img_brightness_augmented, (256, 256), interpolation=cv2.INTER_LINEAR)
+                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_rgb", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(target_robot_img, cv2.COLOR_RGB2BGR))
+                #cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_rgb_brightness_augmented", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(target_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_mask", f"{episode}/{pose_index}.jpg"), target_robot_seg_img * 255)
             
-            
-            '''
-            if robot_dataset == "viola" and self.target_name == "Jaco":
-                camera_pose[:3] -= np.array([0, 0, 0.1])
-            elif robot_dataset == "austin_mutex" and self.target_name == "Jaco":
-                camera_pose[:3] -= np.array([0, 0, 0.1])
-            elif robot_dataset == "nyu_franka" and self.target_name == "Jaco":
-                camera_pose[:3] += np.array([-0.1, 0, 0.1])
-            '''
-            
-            joint_indices = self.target_env.env.robots[0]._ref_joint_pos_indexes
-            current_joint_angles = self.target_env.env.sim.data.qpos[joint_indices]
-            #print("Current joint angles:", current_joint_angles)
-
-            target_robot_img, target_robot_seg_img = self.target_env.get_observation(white_background=True)
-            
-            # sample a random integer between -40 and 40
-            target_robot_img_brightness_augmented = change_brightness(target_robot_img, value=np.random.randint(-40, 40), mask=target_robot_seg_img)
-            target_robot_img_brightness_augmented = cv2.resize(target_robot_img_brightness_augmented, (256, 256), interpolation=cv2.INTER_LINEAR)
-            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_rgb", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(target_robot_img, cv2.COLOR_RGB2BGR))
-            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_rgb_brightness_augmented", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(target_robot_img_brightness_augmented, cv2.COLOR_RGB2BGR))
-            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_mask", f"{episode}/{pose_index}.jpg"), target_robot_seg_img * 255)
-        
-        target_pose_array = np.vstack(target_pose_list)
-        eef_npy_path = os.path.join(save_paired_images_folder_path, f"{self.target_name}_eef_states_{episode}.npy")
-        np.save(eef_npy_path, target_pose_array)
+            if target_pose_list == []:
+                target_pose_list.append(np.zeros(3))
+            target_pose_array = np.vstack(target_pose_list)
+            eef_npy_path = os.path.join(save_paired_images_folder_path, "source_robot_states", f"{self.target_name}_eef_states_{episode}.npy")
+            np.save(eef_npy_path, target_pose_array)
 
 
         
@@ -192,7 +204,6 @@ if __name__ == "__main__":
     parser.add_argument("--robot_dataset", type=str, help="(optional) to match the robot poses from a dataset, provide the dataset name")
     parser.add_argument("--reference_joint_angles_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the joint angles file (np.savetxt)")
     parser.add_argument("--reference_ee_states_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the ee state file (np.savetxt)")
-    parser.add_argument("--episode", type=int, default=0, help="episode number")
     args = parser.parse_args()
     
     
@@ -213,9 +224,6 @@ if __name__ == "__main__":
 
     # Save the captured images
     save_paired_images_folder_path = os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/paired_images", args.robot_dataset)
-    os.makedirs(os.path.join(save_paired_images_folder_path, "{}_rgb".format(target_name), str(args.episode)), exist_ok=True)
-    os.makedirs(os.path.join(save_paired_images_folder_path, "{}_rgb_brightness_augmented".format(target_name), str(args.episode)), exist_ok=True)
-    os.makedirs(os.path.join(save_paired_images_folder_path, "{}_mask".format(target_name), str(args.episode)), exist_ok=True)
     
     if args.robot_dataset is not None:
         from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
@@ -227,13 +235,16 @@ if __name__ == "__main__":
         camera_width = 256
     
     target_env = TargetEnvWrapper(target_name, target_gripper, args.robot_dataset, camera_height, camera_width)
+    env = target_env.target_env.env
+    env.sim.model.opt.timestep = 0.005
+    env.timestep   = 0.01
+    env.n_substeps = 5
 
     target_env.generate_image(
         save_paired_images_folder_path=save_paired_images_folder_path, 
         reference_joint_angles_path=args.reference_joint_angles_path, 
         reference_ee_states_path=args.reference_ee_states_path, 
         robot_dataset=args.robot_dataset, 
-        episode=args.episode
     )
 
     target_env.target_env.env.close_renderer()
