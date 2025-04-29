@@ -100,12 +100,12 @@ class TargetEnvWrapper:
             self.target_env.camera_wrapper.set_camera_fov(fov)
         self.target_env.update_camera()
 
-        for episode in tqdm(range(0, 1000), desc=f'{self.target_name} Pose Generation'):
+        for episode in tqdm(range(908, 1000), desc=f'{self.target_name} Pose Generation'):
             os.makedirs(os.path.join(save_paired_images_folder_path, "{}_rgb".format(target_name), str(episode)), exist_ok=True)
             os.makedirs(os.path.join(save_paired_images_folder_path, "{}_rgb_brightness_augmented".format(target_name), str(episode)), exist_ok=True)
             os.makedirs(os.path.join(save_paired_images_folder_path, "{}_mask".format(target_name), str(episode)), exist_ok=True)
             gripper_count = 0
-            npz_path = os.path.join(save_paired_images_folder_path, f"{episode}.npz")
+            npz_path = os.path.join(save_paired_images_folder_path, "source_robot_states", f"{episode}.npz")
             data = np.load(npz_path, allow_pickle=True)
             target_pose_array = data['pos']
             gripper_array = data['grip']
@@ -128,7 +128,7 @@ class TargetEnvWrapper:
                         self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
                         gripper_count += 1
                 else:
-                    if gripper_count > -GRIPPER_OPEN[self.target_name][1]:
+                    if gripper_count > GRIPPER_OPEN[self.target_name][1]:
                         self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
                         gripper_count -= 1
                 
