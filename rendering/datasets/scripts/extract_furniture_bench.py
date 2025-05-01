@@ -26,7 +26,7 @@ try:
         print(f"Dataset {DATASET} has {total_episodes} episodes in 'train' split.")
 
         # 3) 只读取前 20 个 episode（如果数据多的话）
-        split = 'train[:20]' if total_episodes >= 20 else 'train'
+        split = 'train'
         ds = builder.as_dataset(split=split)
 
         # 4) 遍历每个 episode

@@ -6,10 +6,10 @@ import os
 
 def main():
     # Set your dataset here
-    robot_dataset = "stack"
+    robot_dataset = "autolab_ur5"  # or "asu_table_top_rlds"
     
     # Loop over the desired range of episodes
-    for episode in range(0, 10):  # e.g., episodes 0 through 19
+    for episode in range(0, 20):  # e.g., episodes 0 through 19
         print(f"Processing episode {episode}...")
         
         # Determine the source robot

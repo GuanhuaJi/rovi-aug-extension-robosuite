@@ -1,5 +1,24 @@
 #!/usr/bin/env python3
 """
+torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py \
+  --vla_path "openvla/openvla-7b" \
+  --data_root_dir /home/jiguanhua/openvla/datasets/bridge_orig \
+  --dataset_name bridge_orig \
+  --run_root_dir /home/jiguanhua/openvla/log \
+  --adapter_tmp_dir /home/jiguanhua/openvla/tmp \
+  --lora_rank 32 \
+  --batch_size 16 \
+  --grad_accumulation_steps 1 \
+  --learning_rate 5e-4 \
+  --image_aug False \
+  --wandb_project <PROJECT> \
+  --wandb_entity <ENTITY> \
+  --save_steps <NUMBER OF GRADIENT STEPS PER CHECKPOINT SAVE>
+
+
+torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py   --vla_path "openvla/openvla-7b"   --data_root_dir /home/jiguanhua/openvla/datasets   --dataset_name bridge_orig   --run_root_dir /home/jiguanhua/openvla/log   --adapter_tmp_dir /home/jiguanhua/openvla/tmp   --lora_rank 32   --batch_size 1   --grad_accumulation_steps 4   --learning_rate 5e-4   --image_aug False
+
+
 Merge two folders of binary masks (PNG/JPG/TIFF …).
 By default outputs the pixel-wise INTERSECTION; switch to UNION via --mode.
 

@@ -1,5 +1,10 @@
-# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "stack" --target_robot "Sawyer"
-# python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "stack" --target_robot "Panda"
+'''
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "stack" --target_robot "Sawyer"
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "stack" --target_robot "Panda"
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "autolab_ur5" --target_robot "UR5e"
+'''
+
+
 
 import argparse
 import json
@@ -23,8 +28,16 @@ from transforms3d.quaternions import quat2mat
 import json
 from pathlib import Path
 
+# GRIPPER_OPEN = {
+#     "Panda": [-2, -5],
+#     "IIWA": [10, -10],
+#     "Sawyer": [10, -10],
+#     "Jaco": [10, -10],
+#     "UR5e": [5, -5],
+#     "Kinova3": [5, -5],
+# }
 GRIPPER_OPEN = {
-    "Panda": [-2, -5],
+    "Panda": [10, -10],
     "IIWA": [10, -10],
     "Sawyer": [10, -10],
     "Jaco": [10, -10],
@@ -86,8 +99,8 @@ class TargetEnvWrapper:
     def __init__(self, target_name, target_gripper, robot_dataset, camera_height=256, camera_width=256):
         self.target_env = RobotCameraWrapper(robotname=target_name, grippername=target_gripper, robot_dataset=robot_dataset, camera_height=camera_height, camera_width=camera_width)
         self.target_name = target_name
-        print("TARGET_NAME", target_name)
-        print("DATASET:", robot_dataset)
+        #print("TARGET_NAME", target_name)
+        #print("DATASET:", robot_dataset)
     
     
     def generate_image(self, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, robot_dataset=None, episode=0):
@@ -111,8 +124,12 @@ class TargetEnvWrapper:
         gripper_array = data['grip']
         num_robot_poses = target_pose_array.shape[0]
         target_pose_list = []
+
+        if ROBOT_POSE_DICT[robot_dataset][self.target_name]['safe_angle'] is not None:
+            self.target_env.set_robot_joint_positions(ROBOT_POSE_DICT[robot_dataset][self.target_name]['safe_angle'])
         
         for pose_index in range(num_robot_poses):
+            #print("POSE_INDEX", pose_index)
             target_pose=target_pose_array[pose_index]
             target_pose[:3] -= ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
             '''
@@ -132,7 +149,9 @@ class TargetEnvWrapper:
                     self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
                     gripper_count -= 1
             
+            print("GRIPPER_COUNT", gripper_count)
             target_reached, target_reached_pose = self.target_env.drive_robot_to_target_pose(target_pose=target_pose)
+            print("TARGET_REACHED_POSE", target_reached_pose)
             if not target_reached:
                 blacklist_path = Path(os.path.join(save_paired_images_folder_path, "blacklist.json"))
                 blk = load_blacklist(blacklist_path)
@@ -164,7 +183,7 @@ class TargetEnvWrapper:
             #joint_indices = self.target_env.env.robots[0]._ref_joint_pos_indexes
             #current_joint_angles = self.target_env.env.sim.data.qpos[joint_indices]
 
-            target_robot_img, target_robot_seg_img = self.target_env.get_observation(white_background=True)
+            target_robot_img, target_robot_seg_img = self.target_env.get_observation_fast(white_background=True)
             #target_robot_img_brightness_augmented = change_brightness(target_robot_img, value=np.random.randint(-40, 40), mask=target_robot_seg_img)
             #target_robot_img_brightness_augmented = cv2.resize(target_robot_img_brightness_augmented, (256, 256), interpolation=cv2.INTER_LINEAR)
             cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_rgb", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(target_robot_img, cv2.COLOR_RGB2BGR))
@@ -235,12 +254,12 @@ if __name__ == "__main__":
         camera_width = 256
     
 
-    for episode in tqdm(range(0, 1000), desc=f'{target_name} Pose Generation'):
+    for episode in tqdm(range(0, 20), desc=f'{target_name} Pose Generation'):
         target_env = TargetEnvWrapper(target_name, target_gripper, args.robot_dataset, camera_height, camera_width)
         env = target_env.target_env.env
-        env.sim.model.opt.timestep = 0.005
-        env.timestep   = 0.01
-        env.n_substeps = 5
+        #env.sim.model.opt.timestep = 0.001
+        # env.timestep   = 0.01
+        # env.n_substeps = 5
 
         target_env.generate_image(
             save_paired_images_folder_path=save_paired_images_folder_path, 

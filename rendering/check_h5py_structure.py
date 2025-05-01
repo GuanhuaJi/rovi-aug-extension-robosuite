@@ -44,7 +44,7 @@ def print_hdf5_structure(item, indent=0):
             print_hdf5_structure(subitem, indent + 4)
 
 # 打开文件后只检查指定子目录（group）
-hdf5_filename = "/home/jiguanhua/mirage/robot2robot/image84/lift/image_84.hdf5"
+hdf5_filename = "/home/jiguanhua/mirage/robot2robot/image84/stack/image_84.hdf5"
 with h5py.File(hdf5_filename, 'r') as f:
     demokey_pairing = [0, 1, 10, 100, 101, 
                        102, 103, 104, 105, 106, 
@@ -88,7 +88,7 @@ with h5py.File(hdf5_filename, 'r') as f:
                        95, 96, 97, 98, 99]
     # Suppose the group you want to check is called 'my_sub_group'
     #subgroup = f[f"data/demo_{demokey_pairing[10]}/obs"]  # replace with your actual path
-    subgroup = f[f"data/demo_80/obs"]
+    subgroup = f[f"data/demo_100/obs"]
     print_hdf5_structure(subgroup)
 
 

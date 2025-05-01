@@ -3,12 +3,17 @@ import numpy as np
 import tensorflow_datasets as tfds
 from PIL import Image
 
+def dataset2path(dataset_name):
+    # The GCS path for 'berkeley_cable_routing'
+    return f'gs://gresearch/robotics/{dataset_name}/0.1.0'
+
 DATASET = "austin_buds_dataset_converted_externally_to_rlds"
 
 try:
     # 加载 train split 中的前 20 个 episode
-    ds = tfds.load(DATASET, split='train[:20]')
-    print(f"Dataset '{DATASET}' loaded. Processing first 20 episodes...")
+    builder = tfds.builder_from_directory(builder_dir=dataset2path(DATASET))
+
+    ds = builder.as_dataset(split='train')
 
     # 遍历每个 episode
     for episode_num, episode in enumerate(ds):

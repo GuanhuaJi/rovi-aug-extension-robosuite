@@ -8,7 +8,7 @@ DATASET_GCS_PATH = "gs://gresearch/robotics/viola/0.1.0"
 try:
     # 1. 使用 tfds.load 下载 viola 数据集，并只加载 train split 的前20个 episode
     builder = tfds.builder_from_directory(builder_dir=DATASET_GCS_PATH)
-    ds = builder.as_dataset(split="train[:20]", shuffle_files=False)
+    ds = builder.as_dataset(split="train", shuffle_files=False)
 
     # 2. 遍历每个 episode（每个 episode 包含一个 'steps' 序列）
     for episode_num, episode in enumerate(ds):

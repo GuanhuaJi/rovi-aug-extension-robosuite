@@ -29,7 +29,7 @@ try:
         print(f"Dataset {DATASET} has {total_episodes} episodes in 'train' split.")
 
         # For example, just take the first 20 episodes
-        split = 'train[:20]' if total_episodes >= 20 else 'train'
+        split = 'train'
         ds = builder.as_dataset(split=split)
 
         # 3) Iterate over episodes

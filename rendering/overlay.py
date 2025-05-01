@@ -101,7 +101,7 @@ def merge_images_with_mask(
         out_path = os.path.join(output_folder, out_name)
         cv2.imwrite(out_path, orig_img)
 
-        print(f"合成完成并保存: {out_path}")
+        #print(f"合成完成并保存: {out_path}")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Merge images with mask and overlay.")
