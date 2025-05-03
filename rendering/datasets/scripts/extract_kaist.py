@@ -13,7 +13,7 @@ def main():
     builder = tfds.builder_from_directory(builder_dir=DATASET_GCS_PATH)
 
     # 2) Load first 20 episodes from 'train' split, no shuffle
-    ds = builder.as_dataset(split="train[:20]", shuffle_files=False)
+    ds = builder.as_dataset(split="train", shuffle_files=False)
 
     # 3) Iterate episodes
     for episode_num, episode in enumerate(ds):

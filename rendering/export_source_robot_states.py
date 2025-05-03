@@ -6,7 +6,8 @@ datasets:
 austin_buds, austin_mutex, austin_sailor, 
 autolab_ur5, can, furniture_bench, iamlab_cmu, 
 lift, nyu_franka, square, stack, three_piece_assembly, 
-taco_play, ucsd_kitchen_rlds, viola
+taco_play, ucsd_kitchen_rlds, viola, kaist
+toto, 
 
 '''
 
@@ -35,8 +36,19 @@ from pathlib import Path
 from typing import Tuple
 from mujoco import mjtObj
 
+import logging
+logger = logging.getLogger(__name__) 
+
 np.set_printoptions(suppress=True, precision=6)
 
+def quat_dist_rad(q1, q2):
+    """
+    最小旋转角：两单位四元数内积的 arccos。
+    输入 shape=(4,), 顺序 [qw, qx, qy, qz]
+    """
+    dot = np.abs(np.dot(q1, q2))
+    dot = np.clip(dot, -1.0, 1.0)  # 数值安全
+    return 2.0 * np.arccos(dot)
 
 def gripper_convert(gripper_state_value, robot_type):
     if robot_type == "autolab_ur5":
@@ -59,6 +71,8 @@ def gripper_convert(gripper_state_value, robot_type):
         return gripper_state_value < 0
     elif robot_type == "iamlab_cmu":
         return gripper_state_value > 0.5
+    elif robot_type == "toto":
+        return gripper_state_value > 0
     elif robot_type == "can":
         return gripper_state_value
     elif robot_type == "lift":
@@ -168,11 +182,29 @@ def sample_robot_ee_pose():
     quat = T.mat2quat(sample_rotation_matrix())
     return np.concatenate((pos, quat))
 
-
+'''
 def compute_pose_error(current_pose, target_pose):
     # quarternions are equivalent up to sign
     error = min(np.linalg.norm(current_pose - target_pose), np.linalg.norm(current_pose - np.concatenate((target_pose[:3], -target_pose[3:]))))
-    return error    
+    return error 
+'''  
+
+def compute_pose_error(current_pose, target_pose,
+                       pos_w=1.0, ori_w=0.1):
+    """
+    current_pose / target_pose: shape=(7,)
+        [x, y, z, qw, qx, qy, qz]
+    返回一个标量误差，越小越好
+    """
+    # 位置误差
+    p_cur, p_tgt = current_pose[:3], target_pose[:3]
+    pos_err = np.linalg.norm(p_cur - p_tgt)
+
+    # 姿态误差（弧度）
+    q_cur, q_tgt = current_pose[3:], target_pose[3:]
+    ori_err = quat_dist_rad(q_cur, q_tgt)
+
+    return pos_w * pos_err + ori_w * ori_err 
 
 def change_brightness(img, value=30, mask=None):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -418,7 +450,6 @@ class RobotCameraWrapper:
             camera_segmentations = "robot_only",
             hard_reset=False,
         )
-        self.env.reset()
         
         self.camera_wrapper = CameraWrapper(self.env)
         
@@ -446,8 +477,9 @@ class RobotCameraWrapper:
         self.base_position = self.env.sim.model.body_pos[self.base_body_id].copy()
         
         #print(f"[DEBUG] 机器人基座 '{self.robot_base_name}' 的世界坐标: {self.base_position}")
-    
-    
+
+
+
     def compute_eef_pose(self):
         pos = np.array(self.env.sim.data.site_xpos[self.env.sim.model.site_name2id(self.env.robots[0].controller.eef_name)])
         rot = np.array(T.mat2quat(self.env.sim.data.site_xmat[self.env.sim.model.site_name2id(self.env.robots[0].controller.eef_name)].reshape([3, 3])))
@@ -461,8 +493,7 @@ class RobotCameraWrapper:
             self.env.sim.data.qvel[qpos_addr] = 0.0
         self.env.sim.forward()
 
-
-    def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.006, num_iter_max=400):
+    def drive_robot_to_target_pose(self, target_pose=None, min_threshold=0.003, max_threshold=0.01, num_iter_max=200):
         # breakpoint()
         # reset robot joint positions so the robot is hopefully not in a weird pose
         # self.set_robot_joint_positions()
@@ -475,7 +506,7 @@ class RobotCameraWrapper:
 
         no_improve_steps = 0
         last_error = error 
-        while error > tracking_error_threshold and num_iters < num_iter_max:
+        while error > min_threshold and num_iters < num_iter_max:
             # print("Current pose: ", current_pose)
             # print("Target pose: ", target_pose)
             # print("Error: ", error)
@@ -488,7 +519,7 @@ class RobotCameraWrapper:
             _, _, _ = fast_step(self.env, action)
             current_pose = self.compute_eef_pose()
             current_joints = self.env.sim.data.qpos[self.env.robots[0]._ref_joint_pos_indexes].copy()
-            print("Current joints: ", current_joints)
+            #print("Current joints: ", current_joints)
             self.some_safe_joint_angles = current_joints
             new_error = compute_pose_error(current_pose, target_pose)
 
@@ -504,7 +535,7 @@ class RobotCameraWrapper:
         current_pose = self.compute_eef_pose()
         self.env.use_camera_obs = True
 
-        if error < tracking_error_threshold:
+        if error < max_threshold:
             return True, current_pose
         else:
             print("Robot is not in the target pose")
@@ -553,6 +584,10 @@ class RobotCameraWrapper:
         else:
             action[-1] = -1            
         obs, _, _, _ = self.env.step(action)
+    
+    def hardset_gripper(self, gripper_state_value):
+        self.env.robots[0].set_gripper_joint_positions(gripper_state_value)
+
     
     def update_camera(self):
         for _ in range(50):
@@ -619,10 +654,6 @@ class RobotCameraWrapper:
         # mask = ((objtype_img == mjtObj.mjOBJ_BODY) &
         #         np.isin(objid_img, list(robot_body_ids))).astype(np.uint8)
         mask = (np.isin(objid_img, list(robot_body_ids))).astype(np.uint8)
-        
-        # print(objid_img.sum(), " robot pixels in the image")
-        
-        # print("mask: ", mask)
         if white_background:
             rgb_out = rgb.copy()
             rgb_out[mask == 0] = 255
@@ -753,7 +784,7 @@ class SourceEnvWrapper:
                     break
                 if robot_dataset == "kaist":
                     gripper_open = False
-                if robot_dataset in ["can", "lift", "square", "stack", "three_piece_assembly"]:
+                elif robot_dataset in ["can", "lift", "square", "stack", "three_piece_assembly"]:
                     gripper_open = (gripper_states[pose_index][0] - gripper_states[pose_index][1]) > 0.06
                 else:
                     gripper_open = gripper_convert(gripper_states[pose_index], robot_dataset)
@@ -833,7 +864,9 @@ if __name__ == "__main__":
         camera_height = 256
         camera_width = 256
     
-    for episode in range(0, 20):
+    num_episode = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]['num_episodes']
+    for episode in range(num_episode):
+    #for episode in range(0, 201):
         source_env = SourceEnvWrapper(source_name, source_gripper, args.robot_dataset, camera_height, camera_width, verbose=args.verbose)
         source_env.get_source_robot_states(
             save_source_robot_states_path=save_source_robot_states_path, 

@@ -11,7 +11,7 @@ def main():
     builder = tfds.builder_from_directory(builder_dir=DATASET_GCS_PATH)
     
     # 2) 从 train split 中加载前 20 个 episode，不打乱文件顺序
-    ds = builder.as_dataset(split="train[:20]", shuffle_files=False)
+    ds = builder.as_dataset(split="train", shuffle_files=False)
     
     # 3) 遍历每个 episode
     for episode_num, episode in enumerate(ds):

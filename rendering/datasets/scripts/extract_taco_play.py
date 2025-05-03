@@ -11,7 +11,7 @@ def main():
     builder = tfds.builder_from_directory(builder_dir=DATASET_PATH)
     
     # 2) Load the first 20 episodes from the 'train' split, unshuffled
-    ds = builder.as_dataset(split="train[:20]", shuffle_files=False)
+    ds = builder.as_dataset(split="train[:1000]", shuffle_files=False)
 
     # 3) Iterate over each episode
     for episode_num, episode in enumerate(ds):

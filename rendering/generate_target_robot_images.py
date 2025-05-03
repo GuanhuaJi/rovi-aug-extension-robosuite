@@ -1,7 +1,24 @@
 '''
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "stack" --target_robot "Sawyer"
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "stack" --target_robot "Panda"
-python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "autolab_ur5" --target_robot "UR5e"
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "autolab_ur5" --target_robot "Kinova3"
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "kaist" --target_robot "Panda"
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_pairs.py --robot_dataset "toto" --target_robot "Panda"
+
+
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "1"
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "2"
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_buds" --target_robot "Kinova3"
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_sailor" --target_robot "Kinova3"
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "iamlab_cmu" --target_robot "2"
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "kaist" --target_robot "Sawyer"
+
+
+datasets: 
+austin_buds, austin_mutex, austin_sailor, 
+autolab_ur5, can, furniture_bench, iamlab_cmu, 
+lift, nyu_franka, square, stack, three_piece_assembly, 
+taco_play, ucsd_kitchen_rlds, viola
 '''
 
 
@@ -128,17 +145,9 @@ class TargetEnvWrapper:
         if ROBOT_POSE_DICT[robot_dataset][self.target_name]['safe_angle'] is not None:
             self.target_env.set_robot_joint_positions(ROBOT_POSE_DICT[robot_dataset][self.target_name]['safe_angle'])
         
-        for pose_index in range(num_robot_poses):
-            #print("POSE_INDEX", pose_index)
+        for pose_index in tqdm(range(num_robot_poses), desc=f'{self.target_name} Pose Generation'):
             target_pose=target_pose_array[pose_index]
             target_pose[:3] -= ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
-            '''
-            if robot_dataset == "viola" and self.target_name == "Jaco":
-                target_pose[:3] -= np.array([0, 0, 0.1])
-            elif robot_dataset == "austin_mutex" and self.target_name == "Jaco":
-                target_pose[:3] -= np.array([0, 0, 0.1])
-            elif robot_dataset == "nyu_franka" and self.target_name == "Jaco":
-                target_pose[:3] += np.array([-0.1, 0, 0.1])
             '''
             if gripper_array[pose_index] == False:
                 if gripper_count < GRIPPER_OPEN[self.target_name][0]:
@@ -148,10 +157,8 @@ class TargetEnvWrapper:
                 if gripper_count > GRIPPER_OPEN[self.target_name][1]:
                     self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
                     gripper_count -= 1
-            
-            print("GRIPPER_COUNT", gripper_count)
+            '''
             target_reached, target_reached_pose = self.target_env.drive_robot_to_target_pose(target_pose=target_pose)
-            print("TARGET_REACHED_POSE", target_reached_pose)
             if not target_reached:
                 blacklist_path = Path(os.path.join(save_paired_images_folder_path, "blacklist.json"))
                 blk = load_blacklist(blacklist_path)
@@ -166,19 +173,10 @@ class TargetEnvWrapper:
                 RESET = "\033[0m"
                 print(f"{RED}[BLACKLIST] Added {self.target_name} – episode {episode}{RESET}")
                 break
-            ppose = self.target_env.compute_eef_pose()[:3] + ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
-            target_pose_list.append(ppose)
+            reached_pose = self.target_env.compute_eef_pose()
+            reached_pose[:3] += ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
+            target_pose_list.append(reached_pose)
             #print("TARGET_REACHED_POSE:", ppose)
-            
-            
-            '''
-            if robot_dataset == "viola" and self.target_name == "Jaco":
-                camera_pose[:3] -= np.array([0, 0, 0.1])
-            elif robot_dataset == "austin_mutex" and self.target_name == "Jaco":
-                camera_pose[:3] -= np.array([0, 0, 0.1])
-            elif robot_dataset == "nyu_franka" and self.target_name == "Jaco":
-                camera_pose[:3] += np.array([-0.1, 0, 0.1])
-            '''
             
             #joint_indices = self.target_env.env.robots[0]._ref_joint_pos_indexes
             #current_joint_angles = self.target_env.env.sim.data.qpos[joint_indices]
@@ -228,44 +226,60 @@ if __name__ == "__main__":
     
     target_name = args.target_robot
 
-    if target_name == "Sawyer":
-        target_gripper = "RethinkGripper"
-    elif target_name == "Jaco":
-        target_gripper = "JacoThreeFingerGripper"
-    elif target_name == "IIWA":
-        target_gripper = "Robotiq85Gripper"
-    elif target_name == "UR5e":
-        target_gripper = "Robotiq85Gripper"
-    elif target_name == "Kinova3":
-        target_gripper = "Robotiq85Gripper"
-    elif target_name == "Panda":
-        target_gripper = "PandaGripper"
+    if target_name in ["Sawyer", "Jaco", "IIWA", "UR5e", "Kinova3", "Panda"]:
+        os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+        robotlist = [target_name]
+    if target_name == "all":
+        robotlist = ["Sawyer", "Jaco", "IIWA", "UR5e", "Kinova3", "Panda"]
+    if target_name == "1":
+        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+        robotlist = ["Sawyer", "Jaco", "IIWA"]
+    if target_name == "2": 
+        os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+        robotlist = ["UR5e", "Kinova3", "Panda"]
 
-    # Save the captured images
-    save_paired_images_folder_path = os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/paired_images", args.robot_dataset)
-    
-    if args.robot_dataset is not None:
-        from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
-        robot_dataset_info = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
-        camera_height = robot_dataset_info["camera_heights"]
-        camera_width = robot_dataset_info["camera_widths"]
-    else:
-        camera_height = 256
-        camera_width = 256
-    
+    for target_name in robotlist:
 
-    for episode in tqdm(range(0, 20), desc=f'{target_name} Pose Generation'):
-        target_env = TargetEnvWrapper(target_name, target_gripper, args.robot_dataset, camera_height, camera_width)
-        env = target_env.target_env.env
-        #env.sim.model.opt.timestep = 0.001
-        # env.timestep   = 0.01
-        # env.n_substeps = 5
+        if target_name == "Sawyer":
+            target_gripper = "RethinkGripper"
+        elif target_name == "Jaco":
+            target_gripper = "JacoThreeFingerGripper"
+        elif target_name == "IIWA":
+            target_gripper = "Robotiq85Gripper"
+        elif target_name == "UR5e":
+            target_gripper = "Robotiq85Gripper"
+        elif target_name == "Kinova3":
+            target_gripper = "Robotiq85Gripper"
+        elif target_name == "Panda":
+            target_gripper = "PandaGripper"
 
-        target_env.generate_image(
-            save_paired_images_folder_path=save_paired_images_folder_path, 
-            reference_joint_angles_path=args.reference_joint_angles_path, 
-            reference_ee_states_path=args.reference_ee_states_path, 
-            robot_dataset=args.robot_dataset, 
-            episode=episode
-        )
-        target_env.target_env.env.close_renderer()
+        # Save the captured images
+        save_paired_images_folder_path = os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/paired_images", args.robot_dataset)
+        
+        if args.robot_dataset is not None:
+            from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
+            robot_dataset_info = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
+            camera_height = robot_dataset_info["camera_heights"]
+            camera_width = robot_dataset_info["camera_widths"]
+        else:
+            camera_height = 256
+            camera_width = 256
+        
+
+        num_episode = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]['num_episodes']
+        for episode in tqdm(range(num_episode), desc=f'{target_name} Pose Generation'):
+        #for episode in tqdm(range(20, 50), desc=f'{target_name} Pose Generation'):
+            target_env = TargetEnvWrapper(target_name, target_gripper, args.robot_dataset, camera_height, camera_width)
+            env = target_env.target_env.env
+            # env.sim.model.opt.timestep = 0.001
+            # env.timestep   = 0.01
+            # env.n_substeps = 5
+
+            target_env.generate_image(
+                save_paired_images_folder_path=save_paired_images_folder_path, 
+                reference_joint_angles_path=args.reference_joint_angles_path, 
+                reference_ee_states_path=args.reference_ee_states_path, 
+                robot_dataset=args.robot_dataset, 
+                episode=episode
+            )
+            target_env.target_env.env.close_renderer()

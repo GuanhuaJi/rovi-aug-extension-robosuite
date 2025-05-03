@@ -11,7 +11,7 @@ def main():
     builder = tfds.builder_from_directory(builder_dir=DATASET_GCS_PATH)
     
     # 2) 从 train split 中加载前 20 个 episode（不打乱文件顺序）
-    ds = builder.as_dataset(split="train[:20]", shuffle_files=False)
+    ds = builder.as_dataset(split="train", shuffle_files=False)
     
     # 3) 遍历每个 episode
     for episode_num, episode in enumerate(ds):
@@ -23,7 +23,7 @@ def main():
         ee_states_list = []       # end-effector 状态（EE state）：取 robot_state 的后 8 个元素
         
         # 设定当前 episode 存储路径
-        folder_path = f"../states/berkeley_autolab_ur5/episode_{episode_num}"
+        folder_path = f"../states/autolab_ur5/episode_{episode_num}"
         os.makedirs(folder_path, exist_ok=True)
         
         # 创建用于存放图像的子文件夹
@@ -37,8 +37,9 @@ def main():
             state = step["observation"]["robot_state"].numpy()
             # 假设 robot_state 的结构为：[0:6] -> joint angles, [6:7] -> gripper state, [7:15] -> end-effector state
             joint_state = state[:6]
-            gripper_state = state[6:7]
-            ee_state = state[7:15]
+            ee_state = state[6:13]
+            gripper_state = state[13:14]
+
             
             joint_states_list.append(joint_state)
             gripper_states_list.append(gripper_state)

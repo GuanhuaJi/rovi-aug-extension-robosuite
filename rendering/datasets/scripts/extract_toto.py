@@ -25,7 +25,7 @@ try:
     if 'train' not in builder.info.splits:
         print("No 'train' split found. Exiting.")
     else:
-        total_episodes = builder.info.splits['train'].num_examples
+        total_episodes = builder.info.splits['train[546:]'].num_examples
         print(f"Dataset {DATASET} has {total_episodes} episodes in 'train' split.")
 
         # For example, just take the first 20 episodes
@@ -38,7 +38,7 @@ try:
             gripper_status_list = []
 
             # Create an output folder for this episode
-            folder_path = f'../states/{DATASET}/episode_{episode_num}'
+            folder_path = f'../states/{DATASET}/episode_{episode_num + 546}'
             os.makedirs(folder_path, exist_ok=True)
             images_folder = os.path.join(folder_path, "images")
             os.makedirs(images_folder, exist_ok=True)
@@ -68,7 +68,7 @@ try:
             np.savetxt(os.path.join(folder_path, 'joint_states.txt'), joint_angles_array)
             np.savetxt(os.path.join(folder_path, 'gripper_states.txt'), gripper_array, fmt='%d')
 
-            print(f"Episode {episode_num} extracted: {joint_angles_array.shape[0]} steps.")
+            print(f"Episode {episode_num + 546} extracted: {joint_angles_array.shape[0]} steps.")
 
 except Exception as e:
     print(f"Error processing dataset {DATASET}: {e}")

@@ -26,7 +26,7 @@ try:
         print(f"Dataset {DATASET} has {total_episodes} episodes in 'train' split.")
 
         # 3) 只读取前 20 个 episode（如果数据多的话）
-        split = 'train'
+        split = 'train[901:]'
         ds = builder.as_dataset(split=split)
 
         # 4) 遍历每个 episode
@@ -36,7 +36,7 @@ try:
             gripper_states_list = []
 
             # 5) 创建本地文件夹
-            folder_path = f'./states/{DATASET}/episode_{episode_num}'
+            folder_path = f'../states/{DATASET}/episode_{episode_num + 901}'
             os.makedirs(folder_path, exist_ok=True)
 
             # 专门放置图像的子文件夹
@@ -87,7 +87,7 @@ try:
             np.savetxt(os.path.join(folder_path, 'joint_states.txt'), joint_states_array)
             np.savetxt(os.path.join(folder_path, 'gripper_states.txt'), gripper_states_array)
 
-            print(f"Episode {episode_num} extracted: {ee_states_array.shape[0]} steps.")
+            print(f"Episode {episode_num + 901} extracted: {ee_states_array.shape[0]} steps.")
 
 except Exception as e:
     print(f"Error processing dataset {DATASET}: {e}")

@@ -9,7 +9,7 @@ DATASET_PATH = "gs://gresearch/robotics/iamlab_cmu_pickup_insert_converted_exter
 def main():
     # 1) Create the DatasetBuilder and load first 20 episodes, unshuffled
     builder = tfds.builder_from_directory(builder_dir=DATASET_PATH)
-    ds = builder.as_dataset(split="train[:20]", shuffle_files=False)
+    ds = builder.as_dataset(split="train", shuffle_files=False)
 
     # 2) Iterate over episodes
     for ep_idx, episode in enumerate(ds):
