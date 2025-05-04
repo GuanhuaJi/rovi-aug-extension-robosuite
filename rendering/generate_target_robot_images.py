@@ -11,7 +11,7 @@ python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_buds" --target_robot "Kinova3"
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_sailor" --target_robot "Kinova3"
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "iamlab_cmu" --target_robot "2"
-python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "kaist" --target_robot "Sawyer"
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_mutex" --target_robot "2"
 
 
 datasets: 
@@ -120,7 +120,7 @@ class TargetEnvWrapper:
         #print("DATASET:", robot_dataset)
     
     
-    def generate_image(self, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, robot_dataset=None, episode=0):
+    def generate_image(self, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, robot_dataset=None, episode=0, camera_height=256, camera_width=256):
         data = np.load(os.path.join(save_paired_images_folder_path, "source_robot_states", f"{episode}.npz"), allow_pickle=True)
         camera_pose = data['camera']
         camera_pose[:3] -= ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
@@ -181,7 +181,7 @@ class TargetEnvWrapper:
             #joint_indices = self.target_env.env.robots[0]._ref_joint_pos_indexes
             #current_joint_angles = self.target_env.env.sim.data.qpos[joint_indices]
 
-            target_robot_img, target_robot_seg_img = self.target_env.get_observation_fast(white_background=True)
+            target_robot_img, target_robot_seg_img = self.target_env.get_observation_fast(white_background=True, width=camera_width, height=camera_height)
             #target_robot_img_brightness_augmented = change_brightness(target_robot_img, value=np.random.randint(-40, 40), mask=target_robot_seg_img)
             #target_robot_img_brightness_augmented = cv2.resize(target_robot_img_brightness_augmented, (256, 256), interpolation=cv2.INTER_LINEAR)
             cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_rgb", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(target_robot_img, cv2.COLOR_RGB2BGR))
@@ -280,6 +280,8 @@ if __name__ == "__main__":
                 reference_joint_angles_path=args.reference_joint_angles_path, 
                 reference_ee_states_path=args.reference_ee_states_path, 
                 robot_dataset=args.robot_dataset, 
-                episode=episode
+                episode=episode,
+                camera_height=camera_height,
+                camera_width=camera_width
             )
             target_env.target_env.env.close_renderer()
