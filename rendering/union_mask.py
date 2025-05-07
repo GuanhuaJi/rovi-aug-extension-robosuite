@@ -94,6 +94,7 @@ def main() -> None:
         if not is_img(a_path):
             continue
 
+
         b_path = args.folder_b / (a_path.name.split("_")[0] + ".jpg")
         if not b_path.exists():
             print(f"[WARN] {b_path.name} 在 B 中缺失，跳过")
@@ -105,9 +106,9 @@ def main() -> None:
             print(f"[WARN] {e}")
             continue
 
-        out_path = args.output_dir / a_path.name
+        out_path = args.output_dir / (a_path.name.split("_")[0] + ".jpg")
         cv2.imwrite(str(out_path), merged_mask)
-        print(f"[OK] 保存 {out_path.relative_to(args.output_dir.parent)}")
+        print(f"[OK] UNION 保存 {out_path.relative_to(args.output_dir.parent)}")
 
 if __name__ == "__main__":
     main()

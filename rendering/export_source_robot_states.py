@@ -1,5 +1,5 @@
 '''
-python /home/jiguanhua/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset stack
+python /home/jiguanhua/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset three_piece_assembly
 
 
 datasets: 
@@ -40,6 +40,12 @@ import logging
 logger = logging.getLogger(__name__) 
 
 np.set_printoptions(suppress=True, precision=6)
+
+def load_blacklist(blacklist_path) -> dict:
+    if blacklist_path.exists() and blacklist_path.stat().st_size > 0:
+        with blacklist_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
 
 def quat_dist_rad(q1, q2):
     """
@@ -478,7 +484,21 @@ class RobotCameraWrapper:
         
         #print(f"[DEBUG] 机器人基座 '{self.robot_base_name}' 的世界坐标: {self.base_position}")
 
+    def get_gripper_width_from_qpos(self):
+        sim   = self.env.sim
+        robot = self.env.robots[0]
 
+        # ① robosuite ≥1.4：官方给好了索引
+        if hasattr(robot, "_ref_gripper_joint_pos_indexes") and robot._ref_gripper_joint_pos_indexes is not None:
+            qpos_idx = robot._ref_gripper_joint_pos_indexes
+        else:
+            # ② 早期版本：根据关节名自己找
+            joint_names = robot.gripper.joints               # e.g. ['gripper0_finger_joint1', 'gripper0_finger_joint2']
+            qpos_idx = [sim.model.get_joint_qpos_addr(name) for name in joint_names]
+
+        finger_qpos = sim.data.qpos[qpos_idx]
+        # 对两指对称平动夹爪 (Panda / Robotiq 85) —— 单边位移乘 2 就是张开宽度
+        return 2.0 * finger_qpos[0]
 
     def compute_eef_pose(self):
         pos = np.array(self.env.sim.data.site_xpos[self.env.sim.model.site_name2id(self.env.robots[0].controller.eef_name)])
@@ -643,16 +663,8 @@ class RobotCameraWrapper:
 
         objtype_img = seg[..., 0]
         objid_img   = seg[..., 1]
-        # print("objtype unique:", np.unique(seg[...,0]))   # expect 2, 3 or both
-        # print("objid unique :", np.unique(seg[...,1])[:10])
 
-
-        #robot_body_ids = collect_robot_body_ids(self.env)
         robot_body_ids = _robot_geom_ids(self.env)
-        # print("robot body ids: ", robot_body_ids)
-
-        # mask = ((objtype_img == mjtObj.mjOBJ_BODY) &
-        #         np.isin(objid_img, list(robot_body_ids))).astype(np.uint8)
         mask = (np.isin(objid_img, list(robot_body_ids))).astype(np.uint8)
         if white_background:
             rgb_out = rgb.copy()
@@ -759,7 +771,7 @@ class SourceEnvWrapper:
             cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
             fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
         elif robot_dataset == "three_piece_assembly":
-            camera_reference_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+            camera_reference_pose = np.array([0.713078462147161, 2.062036796036723e-08, 1.5194726087166726, 0.293668270111084, 0.2936684489250183, 0.6432408690452576, 0.6432409286499023])
             cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
             fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
         else:
@@ -865,6 +877,7 @@ if __name__ == "__main__":
         camera_width = 256
     
     num_episode = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]['num_episodes']
+
     for episode in range(num_episode):
     #for episode in range(0, 201):
         source_env = SourceEnvWrapper(source_name, source_gripper, args.robot_dataset, camera_height, camera_width, verbose=args.verbose)

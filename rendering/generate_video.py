@@ -6,10 +6,10 @@ import os
 
 def main():
     # Set your dataset here
-    robot_dataset = "autolab_ur5"  # or "asu_table_top_rlds"
+    robot_dataset = "three_piece_assembly"  # or "asu_table_top_rlds"
     
     # Loop over the desired range of episodes
-    for episode in range(0, 20):  # e.g., episodes 0 through 19
+    for episode in range(12, 1000):  # e.g., episodes 0 through 19
         print(f"Processing episode {episode}...")
         
         # Determine the source robot
@@ -183,7 +183,7 @@ def main():
 
         # Run each command in sequence
         for cmd in commands:
-            subprocess.run(cmd, check=True)
+            subprocess.run(cmd)
 
         print(f"Episode {episode} completed.\n")
 
