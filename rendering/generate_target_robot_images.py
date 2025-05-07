@@ -26,6 +26,13 @@ python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "Jaco"
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "IIWA"
 
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_sailor" --target_robot "Panda"
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_sailor" --target_robot "Sawyer"
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_sailor" --target_robot "Jaco"
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_sailor" --target_robot "Kinova3"
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_sailor" --target_robot "IIWA"
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_sailor" --target_robot "UR5e"
+
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "three_piece_assembly" --target_robot "Jaco" --blacklist True
 datasets: 
 austin_buds, austin_mutex, austin_sailor, 
@@ -269,7 +276,7 @@ if __name__ == "__main__":
             target_gripper = "PandaGripper"
 
         # Save the captured images
-        save_paired_images_folder_path = os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/paired_images", args.robot_dataset)
+        save_paired_images_folder_path = os.path.join("/home/guanhuaji/mirage/robot2robot/rendering/paired_images", args.robot_dataset)
         
         if args.robot_dataset is not None:
             from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
