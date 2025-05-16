@@ -3,6 +3,31 @@ import numpy as np
 import tensorflow_datasets as tfds
 from PIL import Image
 
+'''
+FeaturesDict({
+    'steps': Dataset({
+        'action': FeaturesDict({
+            'gripper_closedness_action': float32,
+            'rotation_delta': Tensor(shape=(3,), dtype=float32, description=Delta change in roll, pitch, yaw.),
+            'terminate_episode': float32,
+            'world_vector': Tensor(shape=(3,), dtype=float32, description=Delta change in XYZ.),
+        }),
+        'is_first': bool,
+        'is_last': bool,
+        'is_terminal': bool,
+        'observation': FeaturesDict({
+            'hand_image': Image(shape=(480, 640, 3), dtype=uint8),
+            'image': Image(shape=(480, 640, 3), dtype=uint8),
+            'image_with_depth': Image(shape=(480, 640, 1), dtype=float32),
+            'natural_language_embedding': Tensor(shape=(512,), dtype=float32),
+            'natural_language_instruction': string,
+            'robot_state': Tensor(shape=(15,), dtype=float32, description=Explanation of the robot state can be found at https://sites.google.com/corp/view/berkeley-ur5),
+        }),
+        'reward': Scalar(shape=(), dtype=float32),
+    }),
+})
+'''
+
 # 指定数据集所在路径（GCS 或本地目录）
 DATASET_GCS_PATH = "gs://gresearch/robotics/berkeley_autolab_ur5/0.1.0"
 
@@ -21,6 +46,8 @@ def main():
         joint_states_list = []    # 关节角（joint state）：取 robot_state 的前 6 个元素
         gripper_states_list = []  # gripper 状态（breaper state）：取 robot_state 的第 7 个元素（保持 (1,) 数组形式）
         ee_states_list = []       # end-effector 状态（EE state）：取 robot_state 的后 8 个元素
+        actions_list = []        # 动作（action）：取 action 的前 7 个元素
+        language_instructions_list = []  # 语言指令（language instruction）：取 observation 中的 natural_language_instruction
         
         # 设定当前 episode 存储路径
         folder_path = f"../states/autolab_ur5/episode_{episode_num}"
@@ -44,6 +71,17 @@ def main():
             joint_states_list.append(joint_state)
             gripper_states_list.append(gripper_state)
             ee_states_list.append(ee_state)
+            # I want word_vector + rotation_delta + gripper_closedness_action
+            # 取出动作的前 7 个元素
+            action = step["action"]["world_vector"].numpy()
+            # 取出 gripper_closedness_action
+            gripper_closedness_action = [step["action"]["gripper_closedness_action"].numpy()]
+            # 取出 rotation_delta
+            rotation_delta = step["action"]["rotation_delta"].numpy()
+            # 将动作、gripper_closedness_action 和 rotation_delta 组合成一个数组
+            action_combined = np.concatenate((action, rotation_delta, gripper_closedness_action), axis=0)
+            actions_list.append(action_combined)
+            language_instructions_list.append(step["observation"]["natural_language_instruction"].numpy().decode("utf-8"))
             
             # 5) 提取主摄像头图像 (480, 640, 3)
             image_np = step["observation"]["image"].numpy()
@@ -60,6 +98,8 @@ def main():
         np.savetxt(os.path.join(folder_path, "joint_states.txt"), joint_states_array)
         np.savetxt(os.path.join(folder_path, "gripper_states.txt"), gripper_states_array)
         np.savetxt(os.path.join(folder_path, "ee_states.txt"), ee_states_array)
+        np.savetxt(os.path.join(folder_path, "actions.txt"), np.vstack(actions_list))
+        np.savetxt(os.path.join(folder_path, "language_instruction.txt"), np.array(language_instructions_list), fmt="%s")
         
         print(f"[INFO] Episode {episode_num} processed with {joint_states_array.shape[0]} steps.")
 

@@ -1,5 +1,5 @@
 '''
-python /home/jiguanhua/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset three_piece_assembly
+python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset furniture_bench
 
 
 datasets: 
@@ -10,9 +10,6 @@ taco_play, ucsd_kitchen_rlds, viola, kaist
 toto, 
 
 '''
-
-
-
 
 import argparse
 import json
@@ -35,11 +32,45 @@ from robot_pose_dict import ROBOT_POSE_DICT
 from pathlib import Path
 from typing import Tuple
 from mujoco import mjtObj
+import pynvml
 
 import logging
 logger = logging.getLogger(__name__) 
 
 np.set_printoptions(suppress=True, precision=6)
+
+def pick_best_gpu(policy="free-mem"):
+    """
+    Return the index of the “least busy” NVIDIA GPU and set CUDA_VISIBLE_DEVICES
+    so frameworks (PyTorch, TensorFlow, JAX…) will automatically use it.
+
+    policy
+    ------
+    "free-mem"   – prefer the card with the most free memory
+    "low-util"   – prefer the card with the lowest compute utilisation
+    "hybrid"     – most free mem, break ties with lowest utilisation
+    """
+    pynvml.nvmlInit()
+    n = pynvml.nvmlDeviceGetCount()
+
+    best_idx, best_score = None, None
+    for i in range(n):
+        h = pynvml.nvmlDeviceGetHandleByIndex(i)
+        mem = pynvml.nvmlDeviceGetMemoryInfo(h)          # bytes
+        util = pynvml.nvmlDeviceGetUtilizationRates(h)   # %
+        if policy == "free-mem":
+            score = mem.free
+        elif policy == "low-util":
+            score = -util.gpu                            # negative ⇒ lower is better
+        else:  # hybrid
+            score = (mem.free, -util.gpu)                # tuple is fine for max()
+
+        if best_score is None or score > best_score:
+            best_idx, best_score = i, score
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(best_idx)   # frameworks see *only* this GPU
+    print(f"👉  Selected GPU {best_idx}")
+    return best_idx
 
 def load_blacklist(blacklist_path) -> dict:
     if blacklist_path.exists() and blacklist_path.stat().st_size > 0:
@@ -361,57 +392,6 @@ def _robot_geom_ids(env):
         m.geom_name2id(n) for n in names
         if n in m.geom_names
     }
-'''
-def collect_robot_geom_ids(env):
-    sim   = env.sim
-    robot = env.robots[0]
-    model = getattr(robot, "robot_model", robot)
-
-    names = []
-    if getattr(model, "geom_names", []):                 # 新接口
-        names = model.geom_names
-    else:                                                # 老接口兜底
-        names += list(getattr(model, "contact_geoms", []))
-        names += list(getattr(model, "visual_geoms",  []))
-
-    ids = {sim.model.geom_name2id(n) for n in names
-           if n in sim.model.geom_names}
-    if not ids:
-        print("[WARN] robot_ids empty—检查 XML 是否给 geoms 命名")
-    return ids
-'''
-'''
-def _collect_body_ids(env):
-    """返回机器人所有 body_id 组成的 set。"""
-    sim   = env.sim
-    robot = env.robots[0]
-    model = getattr(robot, "robot_model", robot)
-
-    # 1) 先拿 body 名字（有些模型只在 body 上挂 geom）
-    if getattr(model, "body_names", []):
-        names = model.body_names
-    else:                          # 没有就退化成所有 geom 所在 body
-        names = []
-        for gname in getattr(model, "contact_geoms", []) + getattr(model, "visual_geoms", []):
-            gid  = sim.model.geom_name2id(gname)
-            names.append(sim.model.body_id2name(sim.model.geom_bodyid[gid]))
-
-    return {sim.model.body_name2id(n) for n in names if n in sim.model.body_names}
-'''
-
-'''
-def _robot_geom_ids(env):
-    """Collect every geom belonging to the first robot."""
-    sim   = env.sim
-    robot = env.robots[0]
-    model = getattr(robot, "robot_model", robot)
-
-    names = (getattr(model, "geom_names", [])
-             or getattr(model, "visual_geoms", [])
-             +  getattr(model, "contact_geoms", []))
-    return {sim.model.geom_name2id(n) for n in names
-            if n in sim.model.geom_names}
-'''
 def _robot_geom_ids(env):
     sim   = env.sim
     robot = env.robots[0]
@@ -458,25 +438,7 @@ class RobotCameraWrapper:
         )
         
         self.camera_wrapper = CameraWrapper(self.env)
-        
-        #print(robotname)
         from robot_pose_dict import ROBOT_POSE_DICT
-        #self.some_safe_joint_angles = ROBOT_POSE_DICT[robot_dataset][robotname]['safe_angle']
-        '''
-        if robotname == "Panda":
-            self.some_safe_joint_angles = [-0.6102706193923950195, -1.455744981765747070, 1.501405358314514160, -2.240571022033691406, -0.2229462265968322754, 2.963621616363525391, -0.5898305177688598633]
-        elif robotname == "UR5e":
-            self.some_safe_joint_angles = [0.0, 0, 0, 0.0, 0, 0.0]
-        elif robotname == "Sawyer":
-            self.some_safe_joint_angles = [0.2553876936435699463, -0.03010351583361625671, -0.9372422099113464355, 1.432788133621215820, 1.421311497688293457, 0.9351797103881835938, -3.228875875473022461]
-            #self.some_safe_joint_angles = [0.1, -1.18, 0.0, 2.18, 0.1, 1.57, 0.1]
-            #self.some_safe_joint_angles = [1, 1, 1, 1, 1, 1, 1]
-        elif robotname == "IIWA":
-            #self.some_safe_joint_angles = [-0.095583,  0.246849,  0.210468, -1.817155,  6.216322,  1.064266,  6.393936] #viola
-            self.some_safe_joint_angles = [-2.456318, -1.095596, -0.949903,  1.350226,  0.979147, -1.206409,  2.421851] # berkeley
-        elif robotname == "Jaco":
-            self.some_safe_joint_angles = [-3.090315, 1.409086,  1.500532, 1.821214, -4.4519,    4.718327,  1.770046]
-        '''
         self.robot_name = robotname
         self.robot_base_name = f"robot0_base"
         self.base_body_id = self.env.sim.model.body_name2id(self.robot_base_name)
@@ -564,13 +526,6 @@ class RobotCameraWrapper:
             print("Error: ", error)
             return False, current_pose
 
-        # try:
-        #     assert error < tracking_error_threshold, "Starting states are not the same\n"
-            
-        #     return True, current_pose
-        # except:
-        #     return False, current_pose
-
     def set_robot_joint_positions(self, joint_angles=None):
         if joint_angles is None:
             joint_angles = self.some_safe_joint_angles
@@ -615,40 +570,6 @@ class RobotCameraWrapper:
             self.env.sim.step()
             self.env._update_observables()
           
-                               # 拷贝避免后续被覆盖
-    '''
-    def get_observation_fast(
-            self,
-            camera="agentview",
-            width=1280,
-            height=720,
-            white_background=True):
-        """
-        只在需要时渲染一帧 RGB + robot-only mask，完全绕开 env._get_observations().
-        """
-        sim = self.env.sim
-        sim.forward()                                               # 保证数据同步&#8203;:contentReference[oaicite:3]{index=3}
-
-        # ------- 1. RGB -------
-        rgb = sim.render(width=width, height=height,
-                        camera_name=camera)[::-1]                 # flip上下&#8203;:contentReference[oaicite:4]{index=4}
-
-        # ------- 2. MuJoCo 原生分割，每像素 [geom_id, obj_type] -------
-        seg = sim.render(width=width, height=height,
-                        camera_name=camera, segmentation=True)[::-1]  #&#8203;:contentReference[oaicite:5]{index=5}
-
-        geom_ids = seg[..., 0]
-        robot_ids = _robot_geom_ids(self.env)
-        mask = np.isin(geom_ids, list(robot_ids)).astype(np.uint8)
-
-        if white_background:
-            rgb_out = rgb.copy()
-            rgb_out[mask == 0] = 255
-        else:                                       # 只保留机器人像素
-            rgb_out = (rgb * mask[..., None]).astype(np.uint8)
-
-        return rgb_out, mask
-    '''
     def get_observation_fast(self, camera="agentview",
                             width=640, height=480,
                             white_background=True):
@@ -745,8 +666,8 @@ class SourceEnvWrapper:
     
     def get_source_robot_states(self, save_source_robot_states_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, reference_gripper_states_path=None, robot_dataset=None, episode=0):
         info = self._load_dataset_info(robot_dataset)
-        joint_angles = np.loadtxt(os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "joint_states.txt"))
-        gripper_states = np.loadtxt(os.path.join("/home/jiguanhua/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "gripper_states.txt"))
+        joint_angles = np.loadtxt(os.path.join("/home/guanhuaji/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "joint_states.txt"))
+        gripper_states = np.loadtxt(os.path.join("/home/guanhuaji/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "gripper_states.txt"))
         if robot_dataset == "toto":
             joint_angles[:, 5] += 3.14159 / 2
             joint_angles[:, 6] += 3.14159 / 4
@@ -864,7 +785,7 @@ if __name__ == "__main__":
         source_name = "Panda"
         source_gripper = "PandaGripper"
 
-    save_source_robot_states_path = (Path("/home/jiguanhua/mirage/robot2robot/rendering/paired_images") / args.robot_dataset / "source_robot_states")
+    save_source_robot_states_path = (Path("/home/guanhuaji/mirage/robot2robot/rendering/paired_images") / args.robot_dataset / "source_robot_states")
     save_source_robot_states_path.mkdir(parents=True, exist_ok=True)
     
     if args.robot_dataset is not None:
@@ -878,8 +799,17 @@ if __name__ == "__main__":
     
     num_episode = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]['num_episodes']
 
-    for episode in range(num_episode):
-    #for episode in range(0, 201):
+    
+    episodes = range(num_episode // 2)
+    episodes = range(num_episode // 2, num_episode)
+
+    '''
+    conda activate mirage
+    python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset kaist
+    '''
+
+
+    for episode in episodes:
         source_env = SourceEnvWrapper(source_name, source_gripper, args.robot_dataset, camera_height, camera_width, verbose=args.verbose)
         source_env.get_source_robot_states(
             save_source_robot_states_path=save_source_robot_states_path, 

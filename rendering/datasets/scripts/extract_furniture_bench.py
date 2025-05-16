@@ -3,6 +3,33 @@ import numpy as np
 import tensorflow_datasets as tfds
 from PIL import Image  # 用来保存 image
 
+'''
+FeaturesDict({
+    'episode_metadata': FeaturesDict({
+        'file_path': Text(shape=(), dtype=string),
+        'furniture': Text(shape=(), dtype=string),
+        'initial_randomness': Text(shape=(), dtype=string),
+    }),
+    'steps': Dataset({
+        'action': Tensor(shape=(8,), dtype=float32, description=Robot action, consists of [3x eef pos velocities, 4x eef quat velocities, 1x gripper velocity].),
+        'discount': Scalar(shape=(), dtype=float32, description=Discount if provided, default to 1.),
+        'is_first': bool,
+        'is_last': bool,
+        'is_terminal': bool,
+        'language_embedding': Tensor(shape=(512,), dtype=float32, description=Kona language embedding. See https://tfhub.dev/google/universal-sentence-encoder-large/5),
+        'language_instruction': Text(shape=(), dtype=string),
+        'observation': FeaturesDict({
+            'image': Image(shape=(224, 224, 3), dtype=uint8, description=Main camera RGB observation.),
+            'state': Tensor(shape=(35,), dtype=float32, description=Robot state, consists of [3x eef position, 4x eef quaternion, 3x eef linear velocity, 3x eef angular velocity, 7x joint position, 7x joint velocity, 7x joint torque, 1x gripper width].),
+            'wrist_image': Image(shape=(224, 224, 3), dtype=uint8, description=Wrist camera RGB observation.),
+        }),
+        'reward': Scalar(shape=(), dtype=float32, description=+1 reward for each two-part assembly.),
+        'skill_completion': Scalar(shape=(), dtype=float32, description=+1 skill completion reward; otherwise, 0.),
+    }),
+})
+'''
+
+
 def dataset2path(dataset_name):
     """
     根据实际存储情况，返回对应 GCS 或本地目录。
@@ -26,7 +53,7 @@ try:
         print(f"Dataset {DATASET} has {total_episodes} episodes in 'train' split.")
 
         # 3) 只读取前 20 个 episode（如果数据多的话）
-        split = 'train[901:]'
+        split = 'train'
         ds = builder.as_dataset(split=split)
 
         # 4) 遍历每个 episode
@@ -34,9 +61,11 @@ try:
             ee_states_list = []
             joint_states_list = []
             gripper_states_list = []
+            language_instructions_list = []
+            actions_list = []
 
             # 5) 创建本地文件夹
-            folder_path = f'../states/{DATASET}/episode_{episode_num + 901}'
+            folder_path = f'/home/guanhuaji/mirage/robot2robot/rendering/datasets/states/{DATASET}/episode_{episode_num}'
             os.makedirs(folder_path, exist_ok=True)
 
             # 专门放置图像的子文件夹
@@ -78,16 +107,27 @@ try:
                 img_filename = os.path.join(images_folder_path, f'{step_idx}.jpeg')
                 img_pil.save(img_filename)
 
+                language_instructions_list.append(step['language_instruction'].numpy().decode("utf-8"))
+
+                actions_list.append(step['action'].numpy())
+
+
+
+
             # 8) 将所需的 state 信息保存为 .txt
             ee_states_array = np.vstack(ee_states_list)         # shape=(T, 7)
             joint_states_array = np.vstack(joint_states_list)   # shape=(T, 7)
             gripper_states_array = np.vstack(gripper_states_list)  # shape=(T, 1)
+            language_instructions_array = np.array(language_instructions_list)  # shape=(T,)
+            actions_array = np.vstack(actions_list)
 
             np.savetxt(os.path.join(folder_path, 'ee_states.txt'), ee_states_array)
             np.savetxt(os.path.join(folder_path, 'joint_states.txt'), joint_states_array)
             np.savetxt(os.path.join(folder_path, 'gripper_states.txt'), gripper_states_array)
+            np.savetxt(os.path.join(folder_path, 'language_instruction.txt'), language_instructions_array, fmt='%s')
+            np.savetxt(os.path.join(folder_path, 'actions.txt'), actions_array)
 
-            print(f"Episode {episode_num + 901} extracted: {ee_states_array.shape[0]} steps.")
+            print(f"Episode {episode_num} extracted: {ee_states_array.shape[0]} steps.")
 
 except Exception as e:
     print(f"Error processing dataset {DATASET}: {e}")

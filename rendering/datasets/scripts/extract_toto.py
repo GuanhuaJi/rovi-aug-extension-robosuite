@@ -25,7 +25,7 @@ try:
     if 'train' not in builder.info.splits:
         print("No 'train' split found. Exiting.")
     else:
-        total_episodes = builder.info.splits['train[546:]'].num_examples
+        total_episodes = builder.info.splits['train'].num_examples
         print(f"Dataset {DATASET} has {total_episodes} episodes in 'train' split.")
 
         # For example, just take the first 20 episodes
@@ -38,7 +38,7 @@ try:
             gripper_status_list = []
 
             # Create an output folder for this episode
-            folder_path = f'../states/{DATASET}/episode_{episode_num + 546}'
+            folder_path = f'/home/guanhuaji/mirage/robot2robot/rendering/datasets/states/{DATASET}/episode_{episode_num}'
             os.makedirs(folder_path, exist_ok=True)
             images_folder = os.path.join(folder_path, "images")
             os.makedirs(images_folder, exist_ok=True)

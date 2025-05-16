@@ -1,7 +1,12 @@
 import os
 import cv2
 import argparse
-
+'''
+python /home/guanhuaji/mirage/robot2robot/rendering/image_to_video.py \
+--folder /home/guanhuaji/mirage/robot2robot/rendering/datasets/states/austin_sailor/episode_0/images \
+--output_video /home/guanhuaji/mirage/robot2robot/rendering/datasets/states/austin_sailor/episode_0/austin_sailor_images.mp4 \
+--fps 30
+'''
 def main(folder, output_video, fps):
     # 1. 定义输入图像所在的文件夹和输出视频路径（由命令行参数接收）
     # 2. 获取文件夹中的所有文件，过滤出图像文件，并按“文件名中的数字”排序

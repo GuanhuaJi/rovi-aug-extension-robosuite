@@ -262,7 +262,7 @@ ROBOT_POSE_DICT = {
         },
         "Jaco": {
             "safe_angle": None, #[-3.090315, 1.409086,  1.500532, 1.821214, -4.4519,    4.718327,  1.770046],
-            "displacement": np.array([0, 0, 0])
+            "displacement": np.array([0.18, 0, 0])
         },
         "UR5e": {
             "safe_angle": None, #[-3.090315, 1.409086,  1.500532, 1.821214, -4.4519,    4.718327,  1.770046],
@@ -270,7 +270,7 @@ ROBOT_POSE_DICT = {
         },
         "Kinova3": {
             "safe_angle": None, #[-3.090315, 1.409086,  1.500532, 1.821214, -4.4519,    4.718327,  1.770046],
-            "displacement": np.array([0, 0, 0])
+            "displacement": np.array([0.1, 0, 0])
         },
         "offset_dist": 0,
         "num_episodes": 1000
