@@ -2,10 +2,10 @@
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate mirage
 
-robot_dataset="furniture_bench"
+robot_dataset="autolab_ur5"
 
-start=5    # 起始分区号
-end=12     # 结束分区号（含）
+start=0    # 起始分区号
+end=8     # 结束分区号（含）
 
 for partition in $(seq "$start" "$((end-1))"); do        # 0‥7
   for robot in Panda Sawyer Jaco Kinova3 IIWA UR5e; do

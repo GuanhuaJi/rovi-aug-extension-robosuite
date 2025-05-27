@@ -55,7 +55,7 @@ def process_folder(input_folder: str, output_folder: str, pad_px: int) -> None:
         expanded = expand_mask_horizontal(mask_binary, pad_px)
         cv2.imwrite(out_path, expanded)
 
-    print(f"Horizontal expansion complete ➜ {output_folder}")
+    #print(f"Horizontal expansion complete ➜ {output_folder}")
 
 
 if __name__ == "__main__":

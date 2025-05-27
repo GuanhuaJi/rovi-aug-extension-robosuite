@@ -19,9 +19,9 @@ python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_sailor" --target_robot "Jaco"
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "austin_sailor" --target_robot "IIWA"
 
-python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "Panda"
-python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "Sawyer"
-python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "Kinova3"
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "Panda" 
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "Sawyer" 
+python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "Kinova3" 
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "UR5e"
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "Jaco"
 python /home/jiguanhua/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "autolab_ur5" --target_robot "IIWA"
@@ -229,7 +229,7 @@ class TargetEnvWrapper:
             self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
             target_reached, target_reached_pose = self.target_env.drive_robot_to_target_pose(target_pose=target_pose)
             if not target_reached:
-                blacklist_path = Path(save_paired_images_folder_path, "blacklist.json")
+                blacklist_path = Path(f"{save_paired_images_folder_path}/{target_name}/blacklist.json")
                 with locked_json(blacklist_path) as blk:          # 🔒 独占锁
                     # 取得/初始化当前机器人的列表
                     robot_list = blk.setdefault(self.target_name, [])
@@ -254,13 +254,13 @@ class TargetEnvWrapper:
 
 
             target_robot_img, target_robot_seg_img = self.target_env.get_observation_fast(white_background=True, width=camera_width, height=camera_height)
-            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_rgb", f"{episode}/{pose_index}.jpg"), cv2.cvtColor(target_robot_img, cv2.COLOR_RGB2BGR))
-            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_mask", f"{episode}/{pose_index}.jpg"), target_robot_seg_img * 255)
+            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_rgb", f"{episode}/{pose_index}.png"), cv2.cvtColor(target_robot_img, cv2.COLOR_RGB2BGR))
+            cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{target_name}_mask", f"{episode}/{pose_index}.png"), target_robot_seg_img * 255)
         
         if success:
             # remove the episode from the blacklist if it exists
             # === 1) 从黑名单里移除 episode =========================================
-            blacklist_path = Path(save_paired_images_folder_path, "blacklist.json")
+            blacklist_path = Path(f"{save_paired_images_folder_path}/{target_name}/blacklist.json")
             with locked_json(blacklist_path) as blk:            # 🔒 独占锁
                 robot_list = blk.get(self.target_name, [])
                 if episode in robot_list:                       # ← 安全修改
@@ -273,7 +273,7 @@ class TargetEnvWrapper:
             # 离开 with 时 locked_json 会写回并释放锁
 
             # === 2) 加入白名单（若尚未存在） =======================================
-            whitelist_path = Path(save_paired_images_folder_path, "whitelist.json")
+            whitelist_path = Path(f"{save_paired_images_folder_path}/{target_name}/whitelist.json")
             with locked_json(whitelist_path) as wl:             # 🔒 独占锁
                 robot_list = wl.get(self.target_name, [])
                 if episode not in robot_list:
@@ -394,9 +394,18 @@ if __name__ == "__main__":
         os.makedirs(os.path.join(save_paired_images_folder_path, "source_robot_states", f"{target_name}", "end_effector"), exist_ok=True) 
         os.makedirs(os.path.join(save_paired_images_folder_path, "source_robot_states", f"{target_name}", "gripper_distance"), exist_ok=True)
         os.makedirs(os.path.join(save_paired_images_folder_path, "source_robot_states", f"{target_name}", "joint_angles"), exist_ok=True)
+        whitelist_path = Path(f"{save_paired_images_folder_path}/{target_name}/whitelist.json")
+        if not whitelist_path.exists():
+            whitelist_path.parent.mkdir(parents=True, exist_ok=True)   # create any missing folders
+            whitelist_path.write_text(json.dumps({}))
+        blacklist_path = Path(f"{save_paired_images_folder_path}/{target_name}/blacklist.json")
+        if not blacklist_path.exists():
+            blacklist_path.parent.mkdir(parents=True, exist_ok=True)
+            blacklist_path.write_text(json.dumps({}))
+
         for episode in episodes:
             # if episode in whitelist, then skip
-            whitelist_path = Path(os.path.join(save_paired_images_folder_path, "whitelist.json"))
+            whitelist_path = Path(f"{save_paired_images_folder_path}/{target_name}/whitelist.json")
             with locked_json(whitelist_path) as wl:
                 robot_list = wl.get(target_name, [])
                 if robot_list and episode in robot_list:

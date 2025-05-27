@@ -1,5 +1,5 @@
 '''
-python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset furniture_bench
+python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset autolab_ur5
 
 
 datasets: 
