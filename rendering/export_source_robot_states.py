@@ -1,5 +1,5 @@
 '''
-python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset autolab_ur5
+python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset autolab_ur5 --partition 0
 
 
 datasets: 
@@ -776,6 +776,7 @@ if __name__ == "__main__":
     parser.add_argument("--reference_ee_states_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the ee state file (np.savetxt)")
     parser.add_argument("--reference_gripper_states_path", type=str, help="(optional) to match the gripper's open/close status")
     parser.add_argument("--verbose", action='store_true', help="If set, prints extra debug/warning information")
+    parser.add_argument("--partition", type=int, default=0, help="(optional) camera height")
     args = parser.parse_args()
 
     if args.robot_dataset == "autolab_ur5" or args.robot_dataset == "asu_table_top_rlds":
@@ -797,11 +798,9 @@ if __name__ == "__main__":
         camera_height = 256
         camera_width = 256
     
+    NUM_PARTITIONS = 20
     num_episode = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]['num_episodes']
-
-    
-    episodes = range(num_episode // 2)
-    episodes = range(num_episode // 2, num_episode)
+    episodes = range(num_episode * args.partition // NUM_PARTITIONS, num_episode * (args.partition + 1) // NUM_PARTITIONS)
 
     '''
     conda activate mirage

@@ -369,7 +369,7 @@ if __name__ == "__main__":
 
         episodes = []
         if args.blacklist:
-            blacklist_path = Path(os.path.join(save_paired_images_folder_path, "blacklist.json"))
+            blacklist_path = Path(f"{save_paired_images_folder_path}/{target_name}/blacklist.json")
             with locked_json(blacklist_path) as blk:                      # 🔒 进入临界区
                 robot_list = blk.get(target_name, [])
                 if robot_list:
