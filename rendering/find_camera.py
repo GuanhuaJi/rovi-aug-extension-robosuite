@@ -373,8 +373,8 @@ class RobotCameraWrapper:
             self.env.sim.data.qvel[qpos_addr] = 0.0
         self.env.sim.forward()
 
-    def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.003, num_iter_max=100):
-        self.set_robot_joint_positions()
+    def drive_robot_to_target_pose(self, target_pose=None, tracking_error_threshold=0.01, num_iter_max=100):
+        #self.set_robot_joint_positions()
         self.env.robots[0].controller.use_delta = False
         assert len(target_pose) == 7, "Target pose should be 7DOF"
         current_pose = self.compute_eef_pose()
@@ -469,17 +469,7 @@ class SourceEnvWrapper:
         # 用于记录标记的状态
         self.marked_pose = None
 
-        self.camera_pose_history = load_camera_pose_history()
-        if len(self.camera_pose_history) == 0:
-            print("[INFO] 没有历史文件或内容为空，使用初始默认相机姿态。")
-            default_pose = [1.25, -0.05, 0.34, 70.0, 0.0, 88.0, 22.0]
-            self.camera_pose_history.append(default_pose)
-            append_camera_pose_to_history(*default_pose)
-        else:
-            print(f"[INFO] 已加载历史相机姿态，共 {len(self.camera_pose_history)} 条。当前使用最后一条为初始。")
-        
-        self.current_camera_pose = self.camera_pose_history[-1]
-        self.apply_camera_pose()
+
     
     def _receive_all_bytes(self, num_bytes: int) -> bytes:
         data = bytearray(num_bytes)
@@ -505,7 +495,7 @@ class SourceEnvWrapper:
             self.source_env.env._update_observables()
 
     def _load_dataset_info(self, dataset_name):
-        from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
+        from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
         info = ROBOT_CAMERA_POSES_DICT[dataset_name]
         return info
     
@@ -525,6 +515,7 @@ class SourceEnvWrapper:
                 joint_angles[:, 1] -= np.pi / 2
                 joint_angles[:, 2] *= -1
                 joint_angles[:, 3] -= np.pi / 2
+                joint_angles[:, 5] -= np.pi
         if "robot_ee_states_path" in info:
             ee_states_path = info["robot_ee_states_path"]
             ee_states = np.loadtxt(ee_states_path)
@@ -532,7 +523,7 @@ class SourceEnvWrapper:
         gripper_states = np.loadtxt(gripper_states_path)
         return joint_angles, ee_states, gripper_states
     
-    def _parse_user_command(self, x, y, z, roll, pitch, yaw, fov):
+    def _parse_user_command(self, x, y, z, roll, pitch, yaw, fov, robot_dataset):
         user_in = input("Modification: ")
         stripped = user_in.strip()
         # 如果输入 m 则标记当前状态
@@ -545,7 +536,7 @@ class SourceEnvWrapper:
             if self.marked_pose is not None:
                 x, y, z, roll, pitch, yaw, fov = self.marked_pose
                 print(f"[INFO] 回退到标记状态: x={x}, y={y}, z={z}, roll={roll}, pitch={pitch}, yaw={yaw}, fov={fov}")
-                append_camera_pose_to_history(x, y, z, roll, pitch, yaw, fov)
+                append_camera_pose_to_history(x, y, z, roll, pitch, yaw, fov, filename=f"tune_{robot_dataset}_camera.txt")
                 self.camera_pose_history.append([x, y, z, roll, pitch, yaw, fov])
                 self.current_camera_pose = [x, y, z, roll, pitch, yaw, fov]
                 return x, y, z, roll, pitch, yaw, fov
@@ -566,7 +557,7 @@ class SourceEnvWrapper:
                 chosen = self.camera_pose_history[-(n+1)]
             x, y, z, roll, pitch, yaw, fov = chosen
             print(f"[INFO] 回退到 {n} 步前 => x={x}, y={y}, z={z}, roll={roll}, pitch={pitch}, yaw={yaw}, fov={fov}")
-            append_camera_pose_to_history(x, y, z, roll, pitch, yaw, fov)
+            append_camera_pose_to_history(x, y, z, roll, pitch, yaw, fov, filename=f"tune_{robot_dataset}_camera.txt")
             self.camera_pose_history.append([x, y, z, roll, pitch, yaw, fov])
             self.current_camera_pose = [x, y, z, roll, pitch, yaw, fov]
             return x, y, z, roll, pitch, yaw, fov
@@ -598,7 +589,7 @@ class SourceEnvWrapper:
             print("[WARNING] 输入格式错误，请重新输入。")
 
         print(f"Now => x={x}, y={y}, z={z}, roll={roll}, pitch={pitch}, yaw={yaw}, fov={fov}")
-        append_camera_pose_to_history(x, y, z, roll, pitch, yaw, fov)
+        append_camera_pose_to_history(x, y, z, roll, pitch, yaw, fov, filename=f"tune_{robot_dataset}_camera.txt")
         self.camera_pose_history.append([x, y, z, roll, pitch, yaw, fov])
         self.current_camera_pose = [x, y, z, roll, pitch, yaw, fov]
         return x, y, z, roll, pitch, yaw, fov
@@ -627,10 +618,38 @@ class SourceEnvWrapper:
         self.source_env.open_close_gripper(gripper_open=gripper_open)
         return reached, actual_pose
 
-    def generate_image(self, num_robot_poses=5, num_cam_poses_per_robot_pose=10, save_paired_images_folder_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, reference_gripper_states_path=None, robot_dataset=None, start_id=0):
+    def generate_image(self, 
+    num_robot_poses=5, 
+    num_cam_poses_per_robot_pose=10, 
+    save_paired_images_folder_path="paired_images", 
+    reference_joint_angles_path=None, 
+    reference_ee_states_path=None, 
+    reference_gripper_states_path=None, 
+    robot_dataset=None, 
+    start_id=0,
+    episode=0):
+        self.camera_pose_history = load_camera_pose_history(filename=f"tune_{robot_dataset}_camera.txt")
+        if len(self.camera_pose_history) == 0:
+            print("[INFO] 没有历史文件或内容为空，使用初始默认相机姿态。")
+            default_pose = [1.25, -0.05, 0.34, 70.0, 0.0, 88.0, 22.0]
+            self.camera_pose_history.append(default_pose)
+            append_camera_pose_to_history(*default_pose, filename=f"tune_{robot_dataset}_camera.txt")
+        else:
+            print(f"[INFO] 已加载历史相机姿态，共 {len(self.camera_pose_history)} 条。当前使用最后一条为初始。")
+        
+        self.current_camera_pose = self.camera_pose_history[-1]
+        self.apply_camera_pose()
+
         x, y, z, roll, pitch, yaw, fov = self.current_camera_pose
         info = self._load_dataset_info(robot_dataset)
-        joint_angles, ee_states, gripper_states = self._load_dataset_files(info, robot_dataset)
+
+        joint_angles = np.loadtxt(os.path.join("/home/guanhuaji/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "joint_states.txt"))
+        gripper_states = np.loadtxt(os.path.join("/home/guanhuaji/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "gripper_states.txt"))
+        joint_angles[:, 1] -= np.pi / 2
+        joint_angles[:, 2] *= -1
+        joint_angles[:, 3] -= np.pi / 2
+        joint_angles[:, 5] -= np.pi / 2
+        ee_states = None
         num_frames = joint_angles.shape[0]
         idxs = [
             0,
@@ -643,7 +662,7 @@ class SourceEnvWrapper:
         print("选取的4个帧下标:", idxs)
 
         while True:
-            x, y, z, roll, pitch, yaw, fov = self._parse_user_command(x, y, z, roll, pitch, yaw, fov)
+            x, y, z, roll, pitch, yaw, fov = self._parse_user_command(x, y, z, roll, pitch, yaw, fov, robot_dataset)
             camera_reference_position = np.array([x, y, z]) + np.array([-0.6, 0.0, 0.912])
             roll_deg = roll
             pitch_deg = pitch
@@ -672,8 +691,8 @@ class SourceEnvWrapper:
 
                 if camera_reference_pose is not None:
                     ref_cam_position, ref_cam_quaternion = camera_reference_pose[:3], camera_reference_pose[3:]
-                    cam_positions = [ref_cam_position] * num_cam_poses_per_robot_pose
-                    cam_quaternions = [ref_cam_quaternion] * num_cam_poses_per_robot_pose
+                    cam_positions = [ref_cam_position]
+                    cam_quaternions = [ref_cam_quaternion]
                 for i, (pos, quat) in enumerate(zip(cam_positions, cam_quaternions)):
                     self.source_env.camera_wrapper.set_camera_pose(pos=pos, quat=quat)
                     camera_pose = self.source_env.camera_wrapper.get_camera_pose_world_frame()
@@ -689,13 +708,15 @@ class SourceEnvWrapper:
                     cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_mask", f"{idx}/{counter}.jpg"), source_robot_seg_img * 255)
                     
                     img2 = Image.open(os.path.join(save_paired_images_folder_path, f"{self.source_name.lower()}_rgb", f"{idx}/{counter}.jpg")).convert("RGBA")
-                    img1 = Image.open(f"./datasets/states/{robot_dataset}/episode_0/images/{idx}.jpeg").convert("RGBA")
+                    img1 = Image.open(f"./datasets/states/{robot_dataset}/episode_{episode}/images/{idx}.jpeg").convert("RGBA")
+                    print(f"./datasets/states/{robot_dataset}/episode_{episode}/images/{idx}.jpeg")
 
                     if img1.size != img2.size:
                         img2 = img2.resize(img1.size)
-                    blended = Image.blend(img1, img2, alpha=0.5)
+                    blended = Image.blend(img1, img2, alpha=0.35)
                     blended_images.append(blended.convert("RGB"))
                     output_path = os.path.join(save_paired_images_folder_path, f"{idx}.jpg")
+                    print(output_path)
                     blended.convert("RGB").save(output_path, "JPEG")
 
             fig, axes = plt.subplots(2, 3, figsize=(8, 8))
@@ -703,7 +724,8 @@ class SourceEnvWrapper:
 
             for i, ax in enumerate(axes.flat):
                 if i < len(blended_images) and blended_images[i] is not None:
-                    ax.imshow(blended_images[i])
+                    img = cv2.imread(os.path.join(save_paired_images_folder_path, f"{idxs[i]}.jpg"))
+                    ax.imshow(img)
                     ax.set_title(f"Frame idx={idxs[i]}")
                 else:
                     ax.text(0.5, 0.5, "No image", ha='center', va='center')
@@ -727,6 +749,10 @@ if __name__ == "__main__":
     Possible robots: Baxter, IIWA, Jaco, Kinova3, Panda, Sawyer, UR5e
     Possible grippers: 'RethinkGripper', 'PandaGripper', 'JacoThreeFingerGripper', 'JacoThreeFingerDexterousGripper', 
     'WipingGripper', 'Robotiq85Gripper', 'Robotiq140Gripper', 'RobotiqThreeFingerGripper', 'RobotiqThreeFingerDexterousGripper'
+
+    conda activate mirage
+    cd /home/guanhuaji/mirage/robot2robot/rendering
+    python /home/guanhuaji/mirage/robot2robot/rendering/find_camera.py --robot_dataset "asu_table_top_rlds"
     """
 
     print("Welcome to robosuite v{}!".format(suite.__version__))
@@ -739,7 +765,7 @@ if __name__ == "__main__":
     parser.add_argument("--source_gripper", type=str, default="PandaGripper", help="PandaGripper or Robotiq85Gripper")
     parser.add_argument("--num_robot_poses", type=int, default=5, help="(optional) number of robot poses to sample")
     parser.add_argument("--num_cam_poses_per_robot_pose", type=int, default=5, help="(optional) number of camera poses per robot pose to sample")
-    parser.add_argument("--save_paired_images_folder_path", type=str, default="paired_images", help="(optional) folder path to save the paired images")
+    parser.add_argument("--save_paired_images_folder_path", type=str, default="/home/guanhuaji/mirage/robot2robot/rendering/tune_cameras", help="(optional) folder path to save the paired images")
     parser.add_argument("--robot_dataset", type=str, help="(optional) to match the robot poses from a dataset, provide the dataset name")
     parser.add_argument("--reference_joint_angles_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the joint angles file (np.savetxt)")
     parser.add_argument("--reference_ee_states_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the ee state file (np.savetxt)")
@@ -755,13 +781,15 @@ if __name__ == "__main__":
         source_name = "Panda"
         source_gripper = "PandaGripper"
     
+    episode = 0
+    
     save_paired_images_folder_path = args.save_paired_images_folder_path
     os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb"), exist_ok=True)
     os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_rgb_brightness_augmented"), exist_ok=True)
     os.makedirs(os.path.join(save_paired_images_folder_path, f"{source_name.lower()}_mask"), exist_ok=True)
     
     if args.robot_dataset is not None:
-        from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
+        from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
         robot_dataset_info = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
         camera_height = robot_dataset_info["camera_heights"]
         camera_width = robot_dataset_info["camera_widths"]
@@ -770,6 +798,14 @@ if __name__ == "__main__":
         camera_width = 256
     
     source_env = SourceEnvWrapper(source_name, source_gripper, camera_height, camera_width, connection=args.connection, port=args.port, verbose=args.verbose)
-    source_env.generate_image(num_robot_poses=args.num_robot_poses, num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, save_paired_images_folder_path=save_paired_images_folder_path, reference_joint_angles_path=args.reference_joint_angles_path, reference_ee_states_path=args.reference_ee_states_path, reference_gripper_states_path=args.reference_gripper_states_path, robot_dataset=args.robot_dataset, start_id=args.start_id)
+    source_env.generate_image(num_robot_poses=args.num_robot_poses, 
+    num_cam_poses_per_robot_pose=args.num_cam_poses_per_robot_pose, 
+    save_paired_images_folder_path=save_paired_images_folder_path, 
+    reference_joint_angles_path=args.reference_joint_angles_path, 
+    reference_ee_states_path=args.reference_ee_states_path, 
+    reference_gripper_states_path=args.reference_gripper_states_path, 
+    robot_dataset=args.robot_dataset, 
+    start_id=args.start_id,
+    episode=episode)
 
     source_env.source_env.env.close_renderer()

@@ -3,6 +3,33 @@ import numpy as np
 import tensorflow_datasets as tfds
 from PIL import Image
 
+'''
+viola
+FeaturesDict({
+    'steps': Dataset({
+        'action': FeaturesDict({
+            'gripper_closedness_action': float32,
+            'rotation_delta': Tensor(shape=(3,), dtype=float32),
+            'terminate_episode': float32,
+            'world_vector': Tensor(shape=(3,), dtype=float32),
+        }),
+        'is_first': bool,
+        'is_last': bool,
+        'is_terminal': bool,
+        'observation': FeaturesDict({
+            'agentview_rgb': Image(shape=(224, 224, 3), dtype=uint8, description=RGB captured by workspace camera),
+            'ee_states': Tensor(shape=(16,), dtype=float32, description=Pose of the end effector specified as a homogenous matrix.),
+            'eye_in_hand_rgb': Image(shape=(224, 224, 3), dtype=uint8, description=RGB captured by in hand camera),
+            'gripper_states': Tensor(shape=(1,), dtype=float32, description=gripper_states = 0 means the gripper is fully closed. The value represents the gripper width of Franka Panda Gripper.),
+            'joint_states': Tensor(shape=(7,), dtype=float32, description=joint values),
+            'natural_language_embedding': Tensor(shape=(512,), dtype=float32),
+            'natural_language_instruction': string,
+        }),
+        'reward': Scalar(shape=(), dtype=float32),
+    }),
+})
+'''
+
 DATASET_GCS_PATH = "gs://gresearch/robotics/viola/0.1.0"
 
 try:
@@ -16,6 +43,7 @@ try:
         ee_states_list = []
         joint_states_list = []
         gripper_states_list = []
+        language_instructions_list = []
 
         # 3. 为每个 episode 创建本地文件夹
         folder_path = f'../states/viola/episode_{episode_num}'
@@ -46,6 +74,8 @@ try:
             # 构造图像保存的文件名（按步编号命名）
             agentview_filename = os.path.join(agentview_folder, f'{step_idx}.jpeg')
 
+            language_instruction = step['observation']['natural_language_instruction'].numpy().decode('utf-8')
+
             # 保存图像
             agentview_img.save(agentview_filename)
 
@@ -57,6 +87,8 @@ try:
         np.savetxt(os.path.join(folder_path, 'ee_states.txt'), ee_states_array)
         np.savetxt(os.path.join(folder_path, 'joint_states.txt'), joint_states_array)
         np.savetxt(os.path.join(folder_path, 'gripper_states.txt'), gripper_states_array)
+        np.savetxt(os.path.join(folder_path, 'language_instruction.txt'), 
+                   [language_instruction], fmt='%s')
 
         print(f"Episode {episode_num} extracted with {ee_states_array.shape[0]} steps.")
 

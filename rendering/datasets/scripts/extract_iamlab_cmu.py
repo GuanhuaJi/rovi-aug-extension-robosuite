@@ -1,3 +1,28 @@
+'''
+FeaturesDict({
+    'episode_metadata': FeaturesDict({
+        'file_path': Text(shape=(), dtype=string),
+    }),
+    'steps': Dataset({
+        'action': Tensor(shape=(8,), dtype=float32, description=Robot action, consists of [3x end-effector position, 4x end-effector quaternion, 1x gripper open/close].),
+        'discount': Scalar(shape=(), dtype=float32, description=Discount if provided, default to 1.),
+        'is_first': bool,
+        'is_last': bool,
+        'is_terminal': bool,
+        'language_embedding': Tensor(shape=(512,), dtype=float32, description=Kona language embedding. See https://tfhub.dev/google/universal-sentence-encoder-large/5),
+        'language_instruction': Text(shape=(), dtype=string),
+        'observation': FeaturesDict({
+            'image': Image(shape=(360, 640, 3), dtype=uint8, description=Main camera RGB observation.),
+            'state': Tensor(shape=(20,), dtype=float32, description=Robot state, consists of [7x robot joint angles, 1x gripper status, 6x joint torques, 6x end-effector force].),
+            'wrist_image': Image(shape=(240, 320, 3), dtype=uint8, description=Wrist camera RGB observation.),
+        }),
+        'reward': Scalar(shape=(), dtype=float32, description=Reward if provided, 1 on final step for demos.),
+    }),
+})
+
+'''
+
+
 import os
 import numpy as np
 import tensorflow_datasets as tfds
@@ -16,7 +41,7 @@ def main():
         print(f"[INFO] Processing Episode {ep_idx}")
         
         # Create output folder for this episode
-        ep_folder = f"./states/iamlab_cmu_pickup_insert_converted_externally_to_rlds/episode_{ep_idx}"
+        ep_folder = f"../states/iamlab_cmu/episode_{ep_idx}"
         os.makedirs(ep_folder, exist_ok=True)
         
         # Subfolders for main camera and wrist camera
@@ -30,19 +55,20 @@ def main():
         ee_pose_list = []       # shape => (T, 7) => [x, y, z, qw, qx, qy, qz]
         joint_angles_list = []  # shape => (T, 7)
         gripper_list = []       # shape => (T, 2) => [commanded_gripper, observed_gripper_status]
+        instruction_list = []
 
         # 3) Iterate over steps within this episode
         for step_idx, step in enumerate(episode["steps"]):
             # --- Extract images ---
             # Main camera: shape = (360, 640, 3)
-            main_img_np = step["observation"]["image"].numpy()
-            main_img = Image.fromarray(main_img_np)
-            main_img.save(os.path.join(main_images_folder, f"{step_idx}.jpeg"), format="JPEG")
+            # main_img_np = step["observation"]["image"].numpy()
+            # main_img = Image.fromarray(main_img_np)
+            # main_img.save(os.path.join(main_images_folder, f"{step_idx}.jpeg"), format="JPEG")
             
-            # Wrist camera: shape = (240, 320, 3)
-            wrist_img_np = step["observation"]["wrist_image"].numpy()
-            wrist_img = Image.fromarray(wrist_img_np)
-            wrist_img.save(os.path.join(wrist_images_folder, f"{step_idx}.jpeg"), format="JPEG")
+            # # Wrist camera: shape = (240, 320, 3)
+            # wrist_img_np = step["observation"]["wrist_image"].numpy()
+            # wrist_img = Image.fromarray(wrist_img_np)
+            # wrist_img.save(os.path.join(wrist_images_folder, f"{step_idx}.jpeg"), format="JPEG")
             
             # --- Extract action info (EE command) ---
             # action = [x, y, z, qw, qx, qy, qz, gripper]
@@ -58,6 +84,9 @@ def main():
             state_arr = step["observation"]["state"].numpy()
             joint_angles = state_arr[0:7]         # shape (7,)
             gripper_status = state_arr[7]         # scalar, e.g. 1=closed, 0=open
+
+            instr = step["language_instruction"].numpy().decode("utf-8")
+            instruction_list.append(instr)
             
             # Store them
             ee_pose_list.append(ee_pose)
@@ -72,6 +101,7 @@ def main():
         np.savetxt(os.path.join(ep_folder, "ee_pose.txt"), ee_pose_array)
         np.savetxt(os.path.join(ep_folder, "joint_states.txt"), joint_array)
         np.savetxt(os.path.join(ep_folder, "gripper_states.txt"), gripper_array)
+        np.savetxt(os.path.join(ep_folder, "language_instructions.txt"), np.array(instruction_list), fmt="%s")
         
         print(f"[INFO] Episode {ep_idx} processed. Steps: {len(ee_pose_list)}")
 

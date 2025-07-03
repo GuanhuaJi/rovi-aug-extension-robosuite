@@ -2,7 +2,33 @@ import os
 import numpy as np
 import tensorflow_datasets as tfds
 from PIL import Image
+'''
+austin_sailor_dataset_converted_externally_to_rlds
+FeaturesDict({
+    'episode_metadata': FeaturesDict({
+        'file_path': Text(shape=(), dtype=string),
+    }),
+    'steps': Dataset({
+        'action': Tensor(shape=(7,), dtype=float32, description=Robot action, consists of [3x ee relative pos, 3x ee relative rotation, 1x gripper action].),
+        'discount': Scalar(shape=(), dtype=float32, description=Discount if provided, default to 1.),
+        'is_first': bool,
+        'is_last': bool,
+        'is_terminal': bool,
+        'language_embedding': Tensor(shape=(512,), dtype=float32, description=Kona language embedding. See https://tfhub.dev/google/universal-sentence-encoder-large/5),
+        'language_instruction': Text(shape=(), dtype=string),
+        'observation': FeaturesDict({
+            'image': Image(shape=(128, 128, 3), dtype=uint8, description=Main camera RGB observation.),
+            'state': Tensor(shape=(8,), dtype=float32, description=Default robot state, consists of [3x robot ee pos, 3x ee quat, 1x gripper state].),
+            'state_ee': Tensor(shape=(16,), dtype=float32, description=End-effector state, represented as 4x4 homogeneous transformation matrix of ee pose.),
+            'state_gripper': Tensor(shape=(1,), dtype=float32, description=Robot gripper opening width. Ranges between ~0 (closed) to ~0.077 (open)),
+            'state_joint': Tensor(shape=(7,), dtype=float32, description=Robot 7-dof joint information (not used in original SAILOR dataset).),
+            'wrist_image': Image(shape=(128, 128, 3), dtype=uint8, description=Wrist camera RGB observation.),
+        }),
+        'reward': Scalar(shape=(), dtype=float32, description=True on last step of the episode.),
+    }),
+})
 
+'''
 # Example GCS path or local directory for the dataset
 DATASET_GCS_PATH = "gs://gresearch/robotics/austin_sailor_dataset_converted_externally_to_rlds/0.1.0"
 
@@ -21,6 +47,7 @@ def main():
         ee_states_list = []      # End-effector state (16,)
         joint_states_list = []   # 7-dof joint state (7,)
         gripper_states_list = [] # Gripper state (1,) —— 这里即为“breaper state”
+        language_instructions_list = [] # 语言指令
         
         # 设定当前 episode 存储路径
         folder_path = f"../states/austin_sailor_dataset_converted_externally_to_rlds/episode_{episode_num}"
@@ -40,6 +67,7 @@ def main():
             joint_state = step["observation"]["state_joint"].numpy()
             # Gripper state: 来自 "state_gripper", shape=(1,)
             gripper_state = step["observation"]["state_gripper"].numpy()
+            language_instruction = step["language_instruction"].numpy().decode("utf-8")
             
             ee_states_list.append(ee_state)
             joint_states_list.append(joint_state)
@@ -61,6 +89,8 @@ def main():
         np.savetxt(os.path.join(folder_path, "ee_states.txt"), ee_states_array)
         np.savetxt(os.path.join(folder_path, "joint_states.txt"), joint_states_array)
         np.savetxt(os.path.join(folder_path, "gripper_states.txt"), gripper_states_array)
+        np.savetxt(os.path.join(folder_path, "language_instruction.txt"), 
+                   np.array(language_instructions_list, dtype=object), fmt="%s")
         
         print(f"[INFO] Episode {episode_num} processed with {ee_states_array.shape[0]} steps.")
 

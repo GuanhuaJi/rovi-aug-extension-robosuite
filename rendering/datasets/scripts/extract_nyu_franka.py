@@ -3,6 +3,31 @@ import numpy as np
 import tensorflow_datasets as tfds
 from PIL import Image
 
+'''
+FeaturesDict({
+    'episode_metadata': FeaturesDict({
+        'file_path': Text(shape=(), dtype=string),
+    }),
+    'steps': Dataset({
+        'action': Tensor(shape=(15,), dtype=float32, description=Robot action, consists of [7x joint velocities, 3x EE delta xyz, 3x EE delta rpy, 1x gripper position, 1x terminate episode].),
+        'discount': Scalar(shape=(), dtype=float32, description=Discount if provided, default to 1.),
+        'is_first': bool,
+        'is_last': bool,
+        'is_terminal': bool,
+        'language_embedding': Tensor(shape=(512,), dtype=float32, description=Kona language embedding. See https://tfhub.dev/google/universal-sentence-encoder-large/5),
+        'language_instruction': Text(shape=(), dtype=string),
+        'observation': FeaturesDict({
+            'depth': Tensor(shape=(128, 128, 1), dtype=int32, description=Right camera depth observation.),
+            'depth_additional_view': Tensor(shape=(128, 128, 1), dtype=int32, description=Left camera depth observation.),
+            'image': Image(shape=(128, 128, 3), dtype=uint8, description=Right camera RGB observation.),
+            'image_additional_view': Image(shape=(128, 128, 3), dtype=uint8, description=Left camera RGB observation.),
+            'state': Tensor(shape=(13,), dtype=float32, description=Robot state, consists of [7x robot joint angles, 3x EE xyz, 3x EE rpy.),
+        }),
+        'reward': Scalar(shape=(), dtype=float32, description=Reward if provided, 1 on final step for demos.),
+    }),
+})
+'''
+
 # 指定数据集所在路径（GCS 或本地目录）
 DATASET_GCS_PATH = "gs://gresearch/robotics/nyu_franka_play_dataset_converted_externally_to_rlds/0.1.0"
 
@@ -21,9 +46,10 @@ def main():
         joint_states_list = []    # 7-dof joint angles (observation/state[0:7])
         ee_states_list = []       # End-effector state (observation/state[7:13], 6-dim)
         gripper_states_list = []  # Gripper state (extracted from action, index 13)
+        language_instructions = []  # 用于存储语言指令
         
         # 设定当前 episode 的存储路径
-        folder_path = f"../states/nyu_franka_play_dataset_converted_externally_to_rlds/episode_{episode_num}"
+        folder_path = f"../states/nyu_franka/episode_{episode_num}"
         os.makedirs(folder_path, exist_ok=True)
         
         # 创建用于存放图像的文件夹
@@ -52,6 +78,9 @@ def main():
             # 保存为 JPEG 格式，文件名格式为 "0.jpeg", "1.jpeg", …
             image_filename = os.path.join(images_folder, f"{step_idx}.jpeg")
             img.save(image_filename, format="JPEG")
+
+            language_instruction = step["language_instruction"].numpy().decode('utf-8')
+            language_instructions.append(language_instruction)
         
         # 6) 将列表转换为 numpy 数组，并保存为文本文件
         joint_states_array = np.array(joint_states_list)     # shape: (T, 7)
@@ -61,6 +90,9 @@ def main():
         np.savetxt(os.path.join(folder_path, "joint_states.txt"), joint_states_array)
         np.savetxt(os.path.join(folder_path, "ee_states.txt"), ee_states_array)
         np.savetxt(os.path.join(folder_path, "gripper_states.txt"), gripper_states_array)
+        np.savetxt(os.path.join(folder_path, "language_instruction.txt"), 
+                   np.array(language_instructions), fmt="%s")
+
         
         print(f"[INFO] Episode {episode_num} processed with {joint_states_array.shape[0]} steps.")
 

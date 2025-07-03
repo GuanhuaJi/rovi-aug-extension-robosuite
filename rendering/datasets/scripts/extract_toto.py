@@ -2,6 +2,30 @@ import os
 import numpy as np
 import tensorflow_datasets as tfds
 
+'''
+FeaturesDict({
+    'steps': Dataset({
+        'action': FeaturesDict({
+            'open_gripper': bool,
+            'rotation_delta': Tensor(shape=(3,), dtype=float32),
+            'terminate_episode': float32,
+            'world_vector': Tensor(shape=(3,), dtype=float32),
+        }),
+        'is_first': bool,
+        'is_last': bool,
+        'is_terminal': bool,
+        'observation': FeaturesDict({
+            'image': Image(shape=(480, 640, 3), dtype=uint8),
+            'natural_language_embedding': Tensor(shape=(512,), dtype=float32),
+            'natural_language_instruction': string,
+            'state': Tensor(shape=(7,), dtype=float32, description=numpy array of shape (7,). Contains the robot joint states (as absolute joint angles) at each timestep),
+        }),
+        'reward': Scalar(shape=(), dtype=float32),
+    }),
+})
+
+'''
+
 # For saving images
 from PIL import Image
 
@@ -36,6 +60,7 @@ try:
         for episode_num, episode in enumerate(ds):
             joint_angles_list = []
             gripper_status_list = []
+            language_instructions = []
 
             # Create an output folder for this episode
             folder_path = f'/home/guanhuaji/mirage/robot2robot/rendering/datasets/states/{DATASET}/episode_{episode_num}'
@@ -55,10 +80,11 @@ try:
 
                 # --- (C) Extract and save the image
                 # step['observation']['image'] is a tf.Tensor of shape (480, 640, 3)
-                image_np = step['observation']['image'].numpy()
-                image_pil = Image.fromarray(image_np)
-                image_filename = os.path.join(folder_path, f'images/{step_idx}.jpeg')
-                image_pil.save(image_filename)
+                # image_np = step['observation']['image'].numpy()
+                # language_instruction = step['observation']['natural_language_instruction'].numpy().decode('utf-8')
+                # image_pil = Image.fromarray(image_np)
+                # image_filename = os.path.join(folder_path, f'images/{step_idx}.jpeg')
+                # image_pil.save(image_filename)
 
             # 5) Convert joint angles and gripper statuses to numpy arrays
             joint_angles_array = np.vstack(joint_angles_list)       # shape=(T, 7)
@@ -67,8 +93,10 @@ try:
             # 6) Save them as text
             np.savetxt(os.path.join(folder_path, 'joint_states.txt'), joint_angles_array)
             np.savetxt(os.path.join(folder_path, 'gripper_states.txt'), gripper_array, fmt='%d')
+            np.savetxt(os.path.join(folder_path, 'language_instructions.txt'), 
+                       np.array(language_instructions), fmt='%s')
 
-            print(f"Episode {episode_num + 546} extracted: {joint_angles_array.shape[0]} steps.")
+            print(f"Episode {episode_num} extracted: {joint_angles_array.shape[0]} steps.")
 
 except Exception as e:
     print(f"Error processing dataset {DATASET}: {e}")

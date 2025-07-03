@@ -28,7 +28,7 @@ import robosuite.macros as macros
 macros.IMAGE_CONVENTION = "opencv"
 from scipy.spatial.transform import Rotation as R
 from tqdm import tqdm
-from robot_pose_dict import ROBOT_POSE_DICT
+from config.robot_pose_dict import ROBOT_POSE_DICT
 from pathlib import Path
 from typing import Tuple
 from mujoco import mjtObj
@@ -93,13 +93,13 @@ def gripper_convert(gripper_state_value, robot_type):
     elif robot_type == "furniture_bench":
         return gripper_state_value > 0.05
     elif robot_type == "viola":
-        return gripper_state_value > 0.06
+        return gripper_state_value > 0.07 # changed
     elif robot_type == "austin_sailor":
-        return gripper_state_value > 0.05
+        return gripper_state_value > 0.07 # changed
     elif robot_type == "austin_mutex":
-        return gripper_state_value > 0.05
+        return gripper_state_value > 0.07 # changed
     elif robot_type == "austin_buds":
-        return gripper_state_value > 0.05
+        return gripper_state_value > 0.07 # changed
     elif robot_type == "nyu_franka":
         return gripper_state_value >= 0
     elif robot_type == "ucsd_kitchen_rlds":
@@ -120,104 +120,12 @@ def gripper_convert(gripper_state_value, robot_type):
         return gripper_state_value
     elif robot_type == "three_piece_assembly":
         return gripper_state_value
+    elif robot_type == "asu_table_top_rlds":
+        return gripper_state_value < 0
+    elif robot_type == "utokyo_pick_and_place":
+        return gripper_state_value > 0.02
     print("UNKNOWN GRIPPER")
     return None
-
-def image_to_pointcloud(env, depth_map, camera_name, camera_height, camera_width, segmask=None):
-    """
-    Convert depth image to point cloud
-    """
-    real_depth_map = camera_utils.get_real_depth_map(env.sim, depth_map)
-    # Camera transform matrix to project from camera coordinates to world coordinates.
-    extrinsic_matrix = camera_utils.get_camera_extrinsic_matrix(env.sim, camera_name=camera_name)
-    intrinsic_matrix = camera_utils.get_camera_intrinsic_matrix(env.sim, camera_name=camera_name, camera_height=camera_height, camera_width=camera_width)
-
-    # Convert depth image to point cloud
-    points = [] # 3D points in robot frame of shape […, 3]
-    for x in range(camera_width):
-        for y in range(camera_height):
-            if segmask is not None and segmask[y, x] == 0:
-                continue
-            coord_cam_frame = np.array([(x-intrinsic_matrix[0, -1])/intrinsic_matrix[0, 0], (y-intrinsic_matrix[1, -1])/intrinsic_matrix[1, 1], 1]) * real_depth_map[y, x]
-            coord_world_frame = np.dot(extrinsic_matrix, np.concatenate((coord_cam_frame, [1])))
-            points.append(coord_world_frame)
-
-    return points
-
-
-def sample_half_hemisphere(num_samples):
-    radius = np.random.normal(0.85, 0.2, num_samples)
-    hemisphere_center = np.array([-0.31558805, -0.04495631,  1.271939112])
-    theta = np.random.uniform(np.pi/4, np.pi/2.2, num_samples)  # Angle with respect to the z-axis
-    phi = np.random.uniform(-np.pi*3.7/4, np.pi*3.7/4, num_samples)  # Azimuthal angle
-    positions = np.zeros((num_samples, 3))
-    positions[:, 0] = radius * np.sin(theta) * np.cos(phi)  # x-coordinate
-    positions[:, 1] = radius * np.sin(theta) * np.sin(phi)  # y-coordinate
-    positions[:, 2] = radius * np.cos(theta)  # z-coordinate
-
-    # Calculate orientations (quaternions)
-    backward_directions = positions - hemisphere_center
-    backward_directions /= np.linalg.norm(backward_directions, axis=1, keepdims=True)
-    right_directions = np.cross(np.tile(np.array([0, 0, 1]), (num_samples, 1)), backward_directions)  # Assuming right direction is along the x-axis
-    right_directions /= np.linalg.norm(right_directions, axis=1, keepdims=True)
-    up_directions = np.cross(backward_directions, right_directions)
-    up_directions /= np.linalg.norm(up_directions, axis=1, keepdims=True)
-
-    rotations = np.array([np.column_stack((right, down, forward)) for right, down, forward in zip(right_directions, up_directions, backward_directions)])
-    # rotations = np.array([                                                        [[ 0.   ,       0.70614784, -0.70806442     ],
-    #                                                         [ 1.    ,      0.      ,    0.                ],
-    #                                                         [ 0.     ,    -0.70806442 ,-0.70614784     ]]])
-
-    # Convert rotation matrices to quaternions
-    quaternions = []
-    for rotation_matrix in rotations:
-        rotation = Rotation.from_matrix(rotation_matrix)
-        quaternion = rotation.as_quat()
-        quaternions.append(quaternion)
-
-    quaternions = np.array(quaternions)
-
-
-    return positions, quaternions
-
-def sample_robot_ee_pose():
-    # the position should be in the follow range:
-    # x: -0.3 ~ 0.3
-    # y: -0.3 ~ 0.3
-    # z: 0.5 ~ 1.5
-    # np.random.seed(0)
-    pos = np.random.uniform(-0.25, 0.25, 3)
-    pos[2] = np.random.uniform(0.6, 1.3)
-    # quat = np.random.uniform(-1, 1, 4)
-    # quat /= np.linalg.norm(quat)
-    
-    def sample_rotation_matrix():
-        # Sample theta (zenith angle) from a normal distribution centered around pi
-        theta = np.random.normal(loc=np.pi, scale=np.pi/3.5)
-        # print("theta: ", theta)
-        # Sample phi (azimuthal angle) uniformly between 0 and 2*pi
-        phi = np.random.uniform(0, 2*np.pi)
-        
-        # Convert spherical coordinates to Cartesian coordinates
-        z_axis = np.array([np.sin(theta) * np.cos(phi),
-                        np.sin(theta) * np.sin(phi),
-                        np.cos(theta)])
-        
-        # Sample a random vector for the rightward direction (perpendicular to z-axis)
-        rightward = np.random.uniform(-1, 1, size=3)
-        rightward -= np.dot(rightward, z_axis) * z_axis
-        rightward /= np.linalg.norm(rightward)
-        
-        # Compute the inward direction (perpendicular to both z and rightward axes)
-        inward = np.cross(rightward, z_axis)
-        
-        # Construct the rotation matrix
-        R = np.column_stack((inward, rightward, z_axis))
-    
-        return R
-
-    quat = T.mat2quat(sample_rotation_matrix())
-    return np.concatenate((pos, quat))
 
 '''
 def compute_pose_error(current_pose, target_pose):
@@ -242,28 +150,6 @@ def compute_pose_error(current_pose, target_pose,
     ori_err = quat_dist_rad(q_cur, q_tgt)
 
     return pos_w * pos_err + ori_w * ori_err 
-
-def change_brightness(img, value=30, mask=None):
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    h, s, v = cv2.split(hsv)
-    
-    if mask is None:
-        mask = np.ones_like(v)
-    else:
-        mask = mask.squeeze()
-    # Apply mask to the brightness channel
-    if value > 0:
-        lim = 255 - value
-        v[(v > lim) & (mask == 1)] = 255
-        v[(v <= lim) & (mask == 1)] += value
-    else:
-        lim = -value
-        v[(v < lim) & (mask == 1)] = 0
-        v[(v >= lim) & (mask == 1)] -= lim
-
-    final_hsv = cv2.merge((h, s, v))
-    img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
-    return img
 
 class CameraWrapper:
     def __init__(self, env, camera_name="agentview"):
@@ -304,6 +190,13 @@ class CameraWrapper:
         target_pose = np.concatenate((pos + offset, quat))
         current_pose = self.get_camera_pose_world_frame()
         error = compute_pose_error(current_pose, target_pose)
+
+        cid = self.env.sim.model.camera_name2id("agentview")
+        R   = self.env.sim.data.cam_xmat[cid].reshape(3, 3)
+
+        forward_world = -R[:, 2]   # –Z column
+        up_world      =  R[:, 1]   # +Y column
+
         # for _ in range(50):
         #     self.camera_mover.set_camera_pose(pos=pos + offset, quat=quat)
         #     self.env.sim.forward()
@@ -316,25 +209,6 @@ class CameraWrapper:
         # world_camera_pose = T.make_pose(camera_pos, T.quat2mat(camera_quat))
         # print("Camera pose in the world frame:", camera_pos, camera_quat)
         return np.concatenate((camera_pos, camera_quat))
-    
-    def get_camera_pose_file_frame(self, world_camera_pose):
-        file_camera_pose = self.world_in_file.dot(world_camera_pose)
-        camera_pos, camera_quat = T.mat2pose(file_camera_pose)
-        camera_quat = T.convert_quat(camera_quat, to="wxyz")
-
-        print("\n\ncurrent camera tag you should copy")
-        self.cam_tree.set("pos", "{} {} {}".format(camera_pos[0], camera_pos[1], camera_pos[2]))
-        self.cam_tree.set("quat", "{} {} {} {}".format(camera_quat[0], camera_quat[1], camera_quat[2], camera_quat[3]))
-        print(ET.tostring(self.cam_tree, encoding="utf8").decode("utf8"))
-        
-    def perturb_camera(self, seed=None, angle=10, scale=0.15):
-        # np.random.seed(seed)
-        self.camera_mover.rotate_camera(point=None, axis=np.random.uniform(-1, 1, 3), angle=angle)
-        self.camera_mover.move_camera(direction=np.random.uniform(-1, 1, 3), scale=scale)
-        # for _ in range(50):
-        #     self.env.sim.forward()
-        #     self.env.sim.step()
-        #     self.env._update_observables()
         
 
 def fast_step(env, action):
@@ -414,6 +288,17 @@ def _robot_geom_ids(env):
     return ids
 
 
+def load_states_from_harsha(robot_dataset, episode, robot_name):
+    info_path = Path(harsha_dataset_path[robot_dataset]) / str(episode) / f"panda_replay_info_{episode}.npz"
+    info = np.load(info_path, allow_pickle=True)
+    joint_angles = info["joint_positions"]
+    gripper_states = info["gripper_dist"]
+    print(gripper_states)
+    translation = info["translation"]
+    return joint_angles, gripper_states, translation
+
+
+
 class RobotCameraWrapper:
     def __init__(self, robotname="Panda", grippername="PandaGripper", robot_dataset=None, camera_height=256, camera_width=256):
         options = {}
@@ -438,7 +323,7 @@ class RobotCameraWrapper:
         )
         
         self.camera_wrapper = CameraWrapper(self.env)
-        from robot_pose_dict import ROBOT_POSE_DICT
+        from config.robot_pose_dict import ROBOT_POSE_DICT
         self.robot_name = robotname
         self.robot_base_name = f"robot0_base"
         self.base_body_id = self.env.sim.model.body_name2id(self.robot_base_name)
@@ -449,17 +334,13 @@ class RobotCameraWrapper:
     def get_gripper_width_from_qpos(self):
         sim   = self.env.sim
         robot = self.env.robots[0]
-
-        # ① robosuite ≥1.4：官方给好了索引
         if hasattr(robot, "_ref_gripper_joint_pos_indexes") and robot._ref_gripper_joint_pos_indexes is not None:
             qpos_idx = robot._ref_gripper_joint_pos_indexes
         else:
-            # ② 早期版本：根据关节名自己找
             joint_names = robot.gripper.joints               # e.g. ['gripper0_finger_joint1', 'gripper0_finger_joint2']
             qpos_idx = [sim.model.get_joint_qpos_addr(name) for name in joint_names]
 
         finger_qpos = sim.data.qpos[qpos_idx]
-        # 对两指对称平动夹爪 (Panda / Robotiq 85) —— 单边位移乘 2 就是张开宽度
         return 2.0 * finger_qpos[0]
 
     def compute_eef_pose(self):
@@ -475,7 +356,8 @@ class RobotCameraWrapper:
             self.env.sim.data.qvel[qpos_addr] = 0.0
         self.env.sim.forward()
 
-    def drive_robot_to_target_pose(self, target_pose=None, min_threshold=0.003, max_threshold=0.01, num_iter_max=200):
+    #def drive_robot_to_target_pose(self, target_pose=None, min_threshold=0.003, max_threshold=0.3, num_iter_max=100):
+    def drive_robot_to_target_pose(self, target_pose=None, min_threshold=0.003, max_threshold=0.01, num_iter_max=100):
         # breakpoint()
         # reset robot joint positions so the robot is hopefully not in a weird pose
         # self.set_robot_joint_positions()
@@ -518,13 +400,14 @@ class RobotCameraWrapper:
         self.env.use_camera_obs = True
 
         if error < max_threshold:
-            return True, current_pose
+            return True, current_pose, error
         else:
-            print("Robot is not in the target pose")
-            print("Current pose: ", current_pose)
-            print("Target pose: ", target_pose)
-            print("Error: ", error)
-            return False, current_pose
+            print("Failed to drive robot to target pose")
+            # print("Current pose: ", current_pose)
+            # print("Target pose: ", target_pose)
+            print("SUGGESTION: ", target_pose - current_pose)
+            # print("Error: ", error)
+            return False, current_pose, error
 
     def set_robot_joint_positions(self, joint_angles=None):
         if joint_angles is None:
@@ -616,6 +499,7 @@ class RobotCameraWrapper:
         return rgb_img, seg_img
 
 
+
 class SourceEnvWrapper:
     def __init__(self, source_name, source_gripper, robot_dataset, camera_height=256, camera_width=256, verbose=False):
         self.source_env = RobotCameraWrapper(robotname=source_name, grippername=source_gripper, robot_dataset=robot_dataset, camera_height=camera_height, camera_width=camera_width)
@@ -640,7 +524,7 @@ class SourceEnvWrapper:
         return data
 
     def _load_dataset_info(self, dataset_name):
-        from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
+        from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
         info = ROBOT_CAMERA_POSES_DICT[dataset_name]
         return info
     
@@ -663,18 +547,37 @@ class SourceEnvWrapper:
         gripper_states_path = info["gripper_states_path"]
         gripper_states = np.loadtxt(gripper_states_path)
         return joint_angles, ee_states, gripper_states
+
+    
     
     def get_source_robot_states(self, save_source_robot_states_path="paired_images", reference_joint_angles_path=None, reference_ee_states_path=None, reference_gripper_states_path=None, robot_dataset=None, episode=0):
         info = self._load_dataset_info(robot_dataset)
-        joint_angles = np.loadtxt(os.path.join("/home/guanhuaji/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "joint_states.txt"))
-        gripper_states = np.loadtxt(os.path.join("/home/guanhuaji/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "gripper_states.txt"))
+        if robot_dataset == "ucsd_kitchen_rlds" or robot_dataset == "utokyo_pick_and_place":
+            joint_angles, gripper_states, translation = load_states_from_harsha(robot_dataset, episode, self.source_env.robot_name)
+        else:
+            joint_angles = np.loadtxt(os.path.join("/home/guanhuaji/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "joint_states.txt"))
+            gripper_states = np.loadtxt(os.path.join("/home/guanhuaji/mirage/robot2robot/rendering/datasets/states", robot_dataset, f"episode_{episode}", "gripper_states.txt"))
         if robot_dataset == "toto":
             joint_angles[:, 5] += 3.14159 / 2
             joint_angles[:, 6] += 3.14159 / 4
-        if robot_dataset == "autolab_ur5":
+        elif robot_dataset == "autolab_ur5":
             joint_angles[:, 5] += 3.14159 / 2
-        num_robot_poses = joint_angles.shape[0]
-
+        elif robot_dataset == "asu_table_top_rlds":
+            joint_angles[:, 1] -= np.pi / 2
+            joint_angles[:, 2] *= -1
+            joint_angles[:, 3] -= np.pi / 2
+            joint_angles[:, 5] -= np.pi / 2
+        elif robot_dataset == "viola":
+            tol = 1e-8
+            for i, row in enumerate(joint_angles):
+                if not np.all(np.isclose(row, 0.0, atol=tol)):
+                    if i > 0:
+                        joint_angles[:i] = row
+                        print(f"WARNING: first {i} rows were all zeros; "
+                            f"copied row {i} into them.")
+                    break
+            else:
+                print("WARNING: all joint_angles rows are zeros; nothing replaced.")
         if robot_dataset == "can":
             camera_reference_pose = np.array([0.9, 0.1, 1.75, 0.271, 0.271, 0.653, 0.653])
             cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
@@ -695,6 +598,25 @@ class SourceEnvWrapper:
             camera_reference_pose = np.array([0.713078462147161, 2.062036796036723e-08, 1.5194726087166726, 0.293668270111084, 0.2936684489250183, 0.6432408690452576, 0.6432409286499023])
             cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
             fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+        elif robot_dataset == "viola":
+            if episode in info["view_1"]["episodes"]:
+                camera_reference_position = info["view_1"]["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
+                roll_deg = info["view_1"]["roll"]
+                pitch_deg = info["view_1"]["pitch"]
+                yaw_deg = info["view_1"]["yaw"]
+                fov = info["view_1"]["camera_fov"]
+                r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
+                camera_reference_quaternion = r.as_quat()
+                camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
+            elif episode in info["view_2"]["episodes"]:
+                camera_reference_position = info["view_2"]["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
+                roll_deg = info["view_2"]["roll"]
+                pitch_deg = info["view_2"]["pitch"]
+                yaw_deg = info["view_2"]["yaw"]
+                fov = info["view_2"]["camera_fov"]
+                r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
+                camera_reference_quaternion = r.as_quat()
+                camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
         else:
             camera_reference_position = info["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
             roll_deg = info["roll"]
@@ -707,6 +629,7 @@ class SourceEnvWrapper:
 
         target_pose_list = []
         gripper_list = []
+        num_robot_poses = joint_angles.shape[0]
 
         for pose_index in tqdm(range(num_robot_poses), desc=f'{self.source_name} Pose States Calculation'):    
             source_reached = False
@@ -721,21 +644,16 @@ class SourceEnvWrapper:
                     gripper_open = (gripper_states[pose_index][0] - gripper_states[pose_index][1]) > 0.06
                 else:
                     gripper_open = gripper_convert(gripper_states[pose_index], robot_dataset)
-                for i in range(2):
+                for i in range(5):
                     joint_angle = joint_angles[pose_index]
                     self.source_env.teleport_to_joint_positions(joint_angle)
-                    '''
-                    if type(gripper_open) is bool:
-                        self.source_env.open_close_gripper(gripper_open=gripper_open)
-                    else:
-                        self.source_env.set_gripper_joint_positions(gripper_states[pose_index], self.source_name)
-                        gripper_open = (gripper_states[pose_index][0] - gripper_states[pose_index][1]) > 0.06
-                    '''
                     target_pose = self.source_env.compute_eef_pose()
 
             gripper_list.append(gripper_open)
             target_pose_list.append(target_pose)       
         target_pose_array = np.vstack(target_pose_list)
+        if robot_dataset == "ucsd_kitchen_rlds":
+            target_pose_array[:, :3] -= translation
         gripper_array = np.vstack(gripper_list)
         eef_npy_path = os.path.join(
             save_source_robot_states_path, f"{self.source_name}_eef_states_{episode}.npy"
@@ -745,28 +663,13 @@ class SourceEnvWrapper:
         np.save(eef_npy_path, target_pose_array)
         print(f"{GREEN}✔ End effector saved under {eef_npy_path}{RESET}")
         npz_path = os.path.join(save_source_robot_states_path, f"{episode}.npz")
-        np.savez(npz_path, pos=target_pose_array, grip=gripper_array, camera=camera_reference_pose, fov=fov)
+        np.savez(npz_path, pos=target_pose_array, grip=gripper_array)
         print(f"{GREEN}✔ States saved under {npz_path}{RESET}")
 
         
-
+from config.dataset_pair_location import dataset_path, harsha_dataset_path
 
 if __name__ == "__main__":
-
-    """
-    Registered environments: Lift, Stack, NutAssembly, NutAssemblySingle, NutAssemblySquare, NutAssemblyRound,
-                             PickPlace, PickPlaceSingle, PickPlaceMilk, PickPlaceBread, PickPlaceCereal,
-                             PickPlaceCan, Door, Wipe, TwoArmLift, TwoArmPegInHole, TwoArmHandover
-
-    Possible robots: Baxter, IIWA, Jaco, Kinova3, Panda, Sawyer, UR5e
-    Possible grippers: 'RethinkGripper', 'PandaGripper', 'JacoThreeFingerGripper', 'JacoThreeFingerDexterousGripper', 
-    'WipingGripper', 'Robotiq85Gripper', 'Robotiq140Gripper', 'RobotiqThreeFingerGripper', 'RobotiqThreeFingerDexterousGripper'
-    """
-
-    # print welcome info
-    #print("Welcome to robosuite v{}!".format(suite.__version__))
-    #print(suite.__logo__)
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=0, help="(optional) set seed")
     parser.add_argument("--source_gripper", type=str, default="PandaGripper", help="PandaGripper or Robotiq85Gripper")
@@ -786,11 +689,11 @@ if __name__ == "__main__":
         source_name = "Panda"
         source_gripper = "PandaGripper"
 
-    save_source_robot_states_path = (Path("/home/guanhuaji/mirage/robot2robot/rendering/paired_images") / args.robot_dataset / "source_robot_states")
+    save_source_robot_states_path = (Path(dataset_path[args.robot_dataset]) / args.robot_dataset / "source_robot_states")
     save_source_robot_states_path.mkdir(parents=True, exist_ok=True)
     
     if args.robot_dataset is not None:
-        from dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
+        from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
         robot_dataset_info = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
         camera_height = robot_dataset_info["camera_heights"]
         camera_width = robot_dataset_info["camera_widths"]
@@ -798,13 +701,15 @@ if __name__ == "__main__":
         camera_height = 256
         camera_width = 256
     
-    NUM_PARTITIONS = 20
+    NUM_PARTITIONS = 5
     num_episode = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]['num_episodes']
     episodes = range(num_episode * args.partition // NUM_PARTITIONS, num_episode * (args.partition + 1) // NUM_PARTITIONS)
 
     '''
     conda activate mirage
     python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset kaist
+    python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset ucsd_kitchen_rlds
+    python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset utokyo_pick_and_place
     '''
 
 
