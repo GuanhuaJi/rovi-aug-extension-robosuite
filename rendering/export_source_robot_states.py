@@ -72,12 +72,6 @@ def pick_best_gpu(policy="free-mem"):
     print(f"👉  Selected GPU {best_idx}")
     return best_idx
 
-def load_blacklist(blacklist_path) -> dict:
-    if blacklist_path.exists() and blacklist_path.stat().st_size > 0:
-        with blacklist_path.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
-
 def quat_dist_rad(q1, q2):
     """
     最小旋转角：两单位四元数内积的 arccos。
@@ -126,13 +120,6 @@ def gripper_convert(gripper_state_value, robot_type):
         return gripper_state_value > 0.02
     print("UNKNOWN GRIPPER")
     return None
-
-'''
-def compute_pose_error(current_pose, target_pose):
-    # quarternions are equivalent up to sign
-    error = min(np.linalg.norm(current_pose - target_pose), np.linalg.norm(current_pose - np.concatenate((target_pose[:3], -target_pose[3:]))))
-    return error 
-'''  
 
 def compute_pose_error(current_pose, target_pose,
                        pos_w=1.0, ori_w=0.1):
@@ -238,34 +225,8 @@ def fast_step(env, action):
         env.cur_time += env.control_timestep
     if hasattr(env, "timestep"):       # robosuite <=0.3
         env.timestep += 1
-
-    # 4. 直接返回空奖励等（如果你不在意 reward）
     return 0.0, False, {}
 
-def _robot_geom_ids(env):
-    """
-    返回当前 robot 在 sim 中的 geom_id 集合。
-    兼容所有 robosuite 版本：
-        先尝试 .geom_names；
-        否则退化为 contact_geoms + visual_geoms。
-    """
-    robot = env.robots[0]
-    model = getattr(robot, "robot_model", robot)     # robosuite <1.4 没有 robot_model
-    # 1) 优先使用 geom_names（1.6+ 才有）
-    if hasattr(model, "geom_names") and model.geom_names:
-        names = model.geom_names
-    else:                                            # 2) 通用回退逻辑
-        names = []
-        if hasattr(model, "contact_geoms"):
-            names += list(model.contact_geoms)
-        if hasattr(model, "visual_geoms"):
-            names += list(model.visual_geoms)
-    # 转成 geom_id；过滤掉 xml 中被删除或重命名的几何体
-    m = env.sim.model
-    return {
-        m.geom_name2id(n) for n in names
-        if n in m.geom_names
-    }
 def _robot_geom_ids(env):
     sim   = env.sim
     robot = env.robots[0]
@@ -323,13 +284,10 @@ class RobotCameraWrapper:
         )
         
         self.camera_wrapper = CameraWrapper(self.env)
-        from config.robot_pose_dict import ROBOT_POSE_DICT
         self.robot_name = robotname
         self.robot_base_name = f"robot0_base"
         self.base_body_id = self.env.sim.model.body_name2id(self.robot_base_name)
         self.base_position = self.env.sim.model.body_pos[self.base_body_id].copy()
-        
-        #print(f"[DEBUG] 机器人基座 '{self.robot_base_name}' 的世界坐标: {self.base_position}")
 
     def get_gripper_width_from_qpos(self):
         sim   = self.env.sim
@@ -337,11 +295,19 @@ class RobotCameraWrapper:
         if hasattr(robot, "_ref_gripper_joint_pos_indexes") and robot._ref_gripper_joint_pos_indexes is not None:
             qpos_idx = robot._ref_gripper_joint_pos_indexes
         else:
-            joint_names = robot.gripper.joints               # e.g. ['gripper0_finger_joint1', 'gripper0_finger_joint2']
+            joint_names = robot.gripper.joints
             qpos_idx = [sim.model.get_joint_qpos_addr(name) for name in joint_names]
 
         finger_qpos = sim.data.qpos[qpos_idx]
-        return 2.0 * finger_qpos[0]
+        if self.robot_name == "Panda":
+            return 2.0 * finger_qpos[0], np.clip(2.0 * finger_qpos[0] / 0.08, 0, 1) # close 0 -> open 0.08
+        elif self.robot_name == "UR5e" or self.robot_name == "Kinova3" or self.robot_name == "IIWA":
+            return 2.0 * finger_qpos[0], (1 - np.clip(2.0 * finger_qpos[0], 0, 1)) # close 1 -> open 0
+        elif self.robot_name == "Sawyer":
+            return 2.0 * finger_qpos[0], 1 - np.clip(2.0 * finger_qpos[0] / -0.024, 0, 1) # close -0.024 -> open 0
+        elif self.robot_name == "Jaco":
+            return 2.0 * finger_qpos[0], np.clip(2.0 * finger_qpos[0] / 2.2, 0, 1) # close 0 -> open 2.2
+        
 
     def compute_eef_pose(self):
         pos = np.array(self.env.sim.data.site_xpos[self.env.sim.model.site_name2id(self.env.robots[0].controller.eef_name)])
@@ -356,13 +322,8 @@ class RobotCameraWrapper:
             self.env.sim.data.qvel[qpos_addr] = 0.0
         self.env.sim.forward()
 
-    #def drive_robot_to_target_pose(self, target_pose=None, min_threshold=0.003, max_threshold=0.3, num_iter_max=100):
     def drive_robot_to_target_pose(self, target_pose=None, min_threshold=0.003, max_threshold=0.01, num_iter_max=100):
-        # breakpoint()
-        # reset robot joint positions so the robot is hopefully not in a weird pose
-        # self.set_robot_joint_positions()
         self.env.robots[0].controller.use_delta = False # change to absolute pose for setting the initial state
-        
         assert len(target_pose) == 7, "Target pose should be 7DOF"
         current_pose = self.compute_eef_pose()
         error = compute_pose_error(current_pose, target_pose)
@@ -371,19 +332,12 @@ class RobotCameraWrapper:
         no_improve_steps = 0
         last_error = error 
         while error > min_threshold and num_iters < num_iter_max:
-            # print("Current pose: ", current_pose)
-            # print("Target pose: ", target_pose)
-            # print("Error: ", error)
             action = np.zeros(7)
             action[:3] = target_pose[:3]
             action[3:6] = T.quat2axisangle(target_pose[3:])
-
-            #obs, _, _, _ = self.env.step(action)
-            #self.env.step(action)
             _, _, _ = fast_step(self.env, action)
             current_pose = self.compute_eef_pose()
             current_joints = self.env.sim.data.qpos[self.env.robots[0]._ref_joint_pos_indexes].copy()
-            #print("Current joints: ", current_joints)
             self.some_safe_joint_angles = current_joints
             new_error = compute_pose_error(current_pose, target_pose)
 
@@ -403,10 +357,7 @@ class RobotCameraWrapper:
             return True, current_pose, error
         else:
             print("Failed to drive robot to target pose")
-            # print("Current pose: ", current_pose)
-            # print("Target pose: ", target_pose)
             print("SUGGESTION: ", target_pose - current_pose)
-            # print("Error: ", error)
             return False, current_pose, error
 
     def set_robot_joint_positions(self, joint_angles=None):
@@ -441,11 +392,7 @@ class RobotCameraWrapper:
             action[-1] = 1
         else:
             action[-1] = -1            
-        obs, _, _, _ = self.env.step(action)
-    
-    def hardset_gripper(self, gripper_state_value):
-        self.env.robots[0].set_gripper_joint_positions(gripper_state_value)
-
+        fast_step(self.env, action)
     
     def update_camera(self):
         for _ in range(50):
@@ -479,26 +426,6 @@ class RobotCameraWrapper:
         return rgb_out, mask
 
 
-    def get_observation(self, white_background=True):
-        view = "agentview"
-        obs = self.env._get_observations()
-        rgb_img_raw = obs[f'{view}_image']
-        seg_img = obs[f'{view}_segmentation_robot_only']
-        num_robot_pixels = np.sum(seg_img)
-        #if num_robot_pixels <= 700:
-            #print(num_robot_pixels, " robot pixels in the image")
-            #return None, None
-        # Create a mask where non-robot pixels are set to 0 and robot pixels are set to 1
-        if white_background:
-            mask = (np.repeat(seg_img, 3, axis=2)).astype(bool)
-            rgb_img = np.where(~mask, [255, 255, 255], rgb_img_raw) # Set non-robot pixels to white
-            rgb_img = rgb_img.astype(np.uint8) # Convert the resulting image to uint8 type
-        else:
-            # only retain the robot part in the rgb_img, set other pixels to black
-            rgb_img = (rgb_img_raw * seg_img).astype(np.uint8)
-        return rgb_img, seg_img
-
-
 
 class SourceEnvWrapper:
     def __init__(self, source_name, source_gripper, robot_dataset, camera_height=256, camera_width=256, verbose=False):
@@ -507,21 +434,6 @@ class SourceEnvWrapper:
         self.fixed_cam_positions = None
         self.fixed_cam_quaternions = None
         self.verbose = verbose
-    
-    def _receive_all_bytes(self, num_bytes: int) -> bytes:
-        """
-        Receives all the bytes.
-        :param num_bytes: The number of bytes.
-        :return: The bytes.
-        """
-        data = bytearray(num_bytes)
-        pos = 0
-        while pos < num_bytes:
-            cr = self.conn.recv_into(memoryview(data)[pos:])
-            if cr == 0:
-                raise EOFError
-            pos += cr
-        return data
 
     def _load_dataset_info(self, dataset_name):
         from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
@@ -598,40 +510,24 @@ class SourceEnvWrapper:
             camera_reference_pose = np.array([0.713078462147161, 2.062036796036723e-08, 1.5194726087166726, 0.293668270111084, 0.2936684489250183, 0.6432408690452576, 0.6432409286499023])
             cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
             fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
-        elif robot_dataset == "viola":
-            if episode in info["view_1"]["episodes"]:
-                camera_reference_position = info["view_1"]["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
-                roll_deg = info["view_1"]["roll"]
-                pitch_deg = info["view_1"]["pitch"]
-                yaw_deg = info["view_1"]["yaw"]
-                fov = info["view_1"]["camera_fov"]
-                r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
-                camera_reference_quaternion = r.as_quat()
-                camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
-            elif episode in info["view_2"]["episodes"]:
-                camera_reference_position = info["view_2"]["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
-                roll_deg = info["view_2"]["roll"]
-                pitch_deg = info["view_2"]["pitch"]
-                yaw_deg = info["view_2"]["yaw"]
-                fov = info["view_2"]["camera_fov"]
-                r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
-                camera_reference_quaternion = r.as_quat()
-                camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
-        else:
-            camera_reference_position = info["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
-            roll_deg = info["roll"]
-            pitch_deg = info["pitch"]
-            yaw_deg = info["yaw"]
-            fov = info["camera_fov"]
-            r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
-            camera_reference_quaternion = r.as_quat()
-            camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
 
+        else:
+            for viewpoint in info["viewpoints"]:
+                if episode in viewpoint["episodes"]:
+                    camera_reference_position = viewpoint["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
+                    roll_deg = viewpoint["roll"]
+                    pitch_deg = viewpoint["pitch"]
+                    yaw_deg = viewpoint["yaw"]
+                    fov = viewpoint["camera_fov"]
+                    r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
+                    camera_reference_quaternion = r.as_quat()
+                    camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
+                    break
         target_pose_list = []
         gripper_list = []
-        num_robot_poses = joint_angles.shape[0]
+        num_frames = joint_angles.shape[0]
 
-        for pose_index in tqdm(range(num_robot_poses), desc=f'{self.source_name} Pose States Calculation'):    
+        for pose_index in tqdm(range(num_frames), desc=f'{self.source_name} Pose States Calculation'):    
             source_reached = False
             attempt_counter = 0
             while source_reached == False:
@@ -663,16 +559,32 @@ class SourceEnvWrapper:
         np.save(eef_npy_path, target_pose_array)
         print(f"{GREEN}✔ End effector saved under {eef_npy_path}{RESET}")
         npz_path = os.path.join(save_source_robot_states_path, f"{episode}.npz")
-        np.savez(npz_path, pos=target_pose_array, grip=gripper_array)
+        #np.savez(npz_path, pos=target_pose_array, grip=gripper_array)
+        
+        #if no element of gripper_states is > 0.09, then divide each element by 0.08
+        if self.source_name == "Panda":
+            if np.all(gripper_array <= 0.09):
+                gripper_states = np.clip(gripper_array / 0.08, 0, 1)
+            else:
+                gripper_states = np.clip(gripper_array, 0, 1)
+        elif self.source_name == "UR5e":
+            if np.all(gripper_array <= 0.06) and np.all(gripper_array >= -0.06):
+                gripper_states = np.clip((gripper_array + 0.05) / 0.1, 0, 1)
+            else:
+                gripper_states = np.clip(gripper_array, 0, 1)
+
+        np.savez(npz_path, pos=target_pose_array, grip=gripper_states)
         print(f"{GREEN}✔ States saved under {npz_path}{RESET}")
 
         
-from config.dataset_pair_location import dataset_path, harsha_dataset_path
+from config.dataset_pair_location import harsha_dataset_path
+from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=0, help="(optional) set seed")
-    parser.add_argument("--source_gripper", type=str, default="PandaGripper", help="PandaGripper or Robotiq85Gripper")
+    parser.add_argument("--source_robot", type=str, help="PandaGripper or Robotiq85Gripper")
+    parser.add_argument("--source_gripper", type=str, help="PandaGripper or Robotiq85Gripper")
     parser.add_argument("--save_paired_images_folder_path", type=str, default="paired_images", help="(optional) folder path to save the paired images")
     parser.add_argument("--robot_dataset", type=str, help="(optional) to match the robot poses from a dataset, provide the dataset name")
     parser.add_argument("--reference_joint_angles_path", type=str, help="(optional) to match the robot poses from a dataset, provide the path to the joint angles file (np.savetxt)")
@@ -682,18 +594,19 @@ if __name__ == "__main__":
     parser.add_argument("--partition", type=int, default=0, help="(optional) camera height")
     args = parser.parse_args()
 
-    if args.robot_dataset == "autolab_ur5" or args.robot_dataset == "asu_table_top_rlds":
+    if args.source_gripper is not None:
+        source_gripper = args.source_gripper
+    elif args.robot_dataset == "autolab_ur5" or args.robot_dataset == "asu_table_top_rlds":
         source_name = "UR5e"
         source_gripper = "Robotiq85Gripper"
     else:
         source_name = "Panda"
         source_gripper = "PandaGripper"
 
-    save_source_robot_states_path = (Path(dataset_path[args.robot_dataset]) / args.robot_dataset / "source_robot_states")
+    save_source_robot_states_path = (Path(ROBOT_CAMERA_POSES_DICT[args.robot_dataset]['replay_path']) / "source_robot_states")
     save_source_robot_states_path.mkdir(parents=True, exist_ok=True)
     
     if args.robot_dataset is not None:
-        from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
         robot_dataset_info = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
         camera_height = robot_dataset_info["camera_heights"]
         camera_width = robot_dataset_info["camera_widths"]

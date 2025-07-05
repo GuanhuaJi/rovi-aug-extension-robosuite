@@ -6,20 +6,6 @@ austin_buds, austin_mutex, austin_sailor,
 autolab_ur5, can, furniture_bench, iamlab_cmu, 
 lift, nyu_franka, square, stack, three_piece_assembly, 
 taco_play, ucsd_kitchen_rlds, viola
-
-
-我要你zip /home/guanhuaji/openpi 但不包含以下文件夹：
-/home/guanhuaji/openpi/sample_bridge_info
-/home/guanhuaji/openpi/sample_fractal_info
-/home/guanhuaji/openpi/bridge_info
-/home/guanhuaji/openpi/bridge_info_new
-/home/guanhuaji/openpi/checkpoints
-/home/guanhuaji/openpi/lid_grids
-/home/guanhuaji/openpi/offline_result
-/home/guanhuaji/openpi/pot_grids
-/home/guanhuaji/openpi/results
-
-
 '''
 
 
@@ -36,7 +22,7 @@ import matplotlib.pyplot as plt
 import robosuite as suite
 import robosuite.macros as macros
 macros.IMAGE_CONVENTION = "opencv"
-from export_source_robot_states import RobotCameraWrapper, change_brightness
+from export_source_robot_states import RobotCameraWrapper
 from config.robot_pose_dict import ROBOT_POSE_DICT
 from tqdm import tqdm
 from transforms3d.quaternions import quat2mat
@@ -50,6 +36,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 from robosuite.utils.transform_utils import mat2quat
+from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
 
 STEP_MAX = 0.02          # 单帧允许的最大 L1 位移（米），1 cm
 ORI_LERP = False
@@ -276,7 +263,6 @@ class TargetEnvWrapper:
         self.target_name = target_name
 
     def _load_dataset_info(self, dataset_name):
-        from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
         info = ROBOT_CAMERA_POSES_DICT[dataset_name]
         return info
     
@@ -303,35 +289,17 @@ class TargetEnvWrapper:
             target_pose_array = data['pos'].copy()
 
         gripper_array = data['grip']
-        if robot_dataset == "viola":
-            if episode in info["view_1"]["episodes"]:
-                camera_reference_position = info["view_1"]["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
-                roll_deg = info["view_1"]["roll"]
-                pitch_deg = info["view_1"]["pitch"]
-                yaw_deg = info["view_1"]["yaw"]
-                fov = info["view_1"]["camera_fov"]
+        for viewpoint in info["viewpoints"]:
+            if episode in viewpoint["episodes"]:
+                camera_reference_position = viewpoint["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
+                roll_deg = viewpoint["roll"]
+                pitch_deg = viewpoint["pitch"]
+                yaw_deg = viewpoint["yaw"]
+                fov = viewpoint["camera_fov"]
                 r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
                 camera_reference_quaternion = r.as_quat()
                 camera_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
-            elif episode in info["view_2"]["episodes"]:
-                camera_reference_position = info["view_2"]["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
-                roll_deg = info["view_2"]["roll"]
-                pitch_deg = info["view_2"]["pitch"]
-                yaw_deg = info["view_2"]["yaw"]
-                fov = info["view_2"]["camera_fov"]
-                r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
-                camera_reference_quaternion = r.as_quat()
-                camera_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
-        else:
-            camera_reference_position = info["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
-            roll_deg = info["roll"]
-            pitch_deg = info["pitch"]
-            yaw_deg = info["yaw"]
-            fov = info["camera_fov"]
-            r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
-            camera_reference_quaternion = r.as_quat()
-            camera_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
-        
+                break
         robot_disp = None
 
         if load_displacement:
@@ -393,7 +361,15 @@ class TargetEnvWrapper:
                         )
                     self.target_env.drive_robot_to_target_pose(target_pose=sub_pose)
 
-            self.target_env.open_close_gripper(gripper_open=gripper_array[pose_index])
+            _, gripper_dist = self.target_env.get_gripper_width_from_qpos()
+            attempt = 0
+            while (gripper_dist < gripper_array[pose_index] - 0.1 or gripper_dist > gripper_array[pose_index] + 0.1) and attempt < 10:
+                if gripper_dist < gripper_array[pose_index] - 0.1:
+                    self.target_env.open_close_gripper(gripper_open=True)
+                elif gripper_dist > gripper_array[pose_index] + 0.1:
+                    self.target_env.open_close_gripper(gripper_open=False)
+                _, gripper_dist = self.target_env.get_gripper_width_from_qpos()
+                attempt += 1
 
                 
             target_reached, target_reached_pose, error = (
@@ -484,9 +460,6 @@ class TargetEnvWrapper:
             np.save(joint_angles_npy_path, joint_angles_array)
             offset_npy_path = os.path.join(save_paired_images_folder_path, "source_robot_states", f"{self.target_name}", "offsets", f"{episode}.npy")
             np.save(offset_npy_path, robot_disp)
-
-
-from config.dataset_pair_location import dataset_path
         
         
 
@@ -499,13 +472,8 @@ if __name__ == "__main__":
 
     Possible robots: Baxter, IIWA, Jaco, Kinova3, Panda, Sawyer, UR5e
     """
-
-    # print welcome info
-    # print("Welcome to robosuite v{}!".format(suite.__version__))
-    # print(suite.__logo__)
-
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seed", type=int, default=0, help="(optional) (optional) set seed")
+    parser.add_argument("--seed", type=int, default=0, help="(optional) set seed")
     parser.add_argument("--target_gripper", type=str, default="Robotiq85Gripper", help="PandaGripper or Robotiq85Gripper")
     parser.add_argument("--num_robot_poses", type=int, default=5, help="(optional) (optional) set seed")
     parser.add_argument("--target_robot", nargs="+", default="IIWA", help="(optional) (optional) set seed")
@@ -534,12 +502,11 @@ if __name__ == "__main__":
         elif target_name == "Panda":
             target_gripper = "PandaGripper"
 
-        save_paired_images_folder_path = os.path.join(dataset_path[args.robot_dataset], args.robot_dataset)
+        save_paired_images_folder_path = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]["replay_path"]
         source_robot_states_path = save_paired_images_folder_path
 
         
         if args.robot_dataset is not None:
-            from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
             robot_dataset_info = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
             camera_height = robot_dataset_info["camera_heights"]
             camera_width = robot_dataset_info["camera_widths"]

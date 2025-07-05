@@ -119,7 +119,7 @@ ROBOTS = {
     "asu_table_top_rlds": ["Sawyer", "IIWA", "Jaco", "Kinova3", "Panda"],
     "autolab_ur5": ["Sawyer", "IIWA", "Jaco", "Kinova3"],
     "ucsd_kitchen_rlds": ["Sawyer", "IIWA", "Jaco", "Kinova3"],
-    "utokyo_pick_and_place": ["Sawyer"],
+    "utokyo_pick_and_place": ["Sawyer", "IIWA", "Jaco", "Kinova3"],
 }
 def episode_task(dataset: str, ep: int):
     # 针对数据集选择机器人列表
@@ -140,17 +140,15 @@ def main():
     #     "taco_play", "iamlab_cmu", "austin_mutex", "austin_sailor", "viola"
     # ]
     robot_datasets = [
-        "utokyo_pick_and_place"
+        "austin_buds"
     ]
-
 
     try:
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
             futures = [
                 pool.submit(episode_task, ds, ep)
                 for ds in robot_datasets
-                #for ep in range(ROBOT_CAMERA_POSES_DICT[ds]["num_episodes"])
-                for ep in range(5)
+                for ep in range(ROBOT_CAMERA_POSES_DICT[ds]["num_episodes"])
             ]
 
             # 逐个 wait；内部异常不会抛到这里

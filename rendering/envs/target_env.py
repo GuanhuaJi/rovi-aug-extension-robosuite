@@ -1,4 +1,5 @@
 from sim.robot_camera import RobotCameraWrapper
+from core.signal import reach_further
 import numpy as np
 import os
 from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
@@ -68,13 +69,9 @@ class TargetEnvWrapper:
                 print(f"WARNING: displacement file not found → {offset_file}; "
                     f"using default [0, 0, 0].")
         else:
-            robot_disp = ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
+            robot_disp = ROBOT_POSE_DICT[robot_dataset][self.target_name]
 
         camera_pose[:3] -= robot_disp
-
-        if robot_dataset == "iamlab_cmu":
-            camera_pose[2] += 0.1
-        
         
         self.target_env.camera_wrapper.set_camera_pose(pos=camera_pose[:3], quat=camera_pose[3:])
         if "fov" in data:
@@ -89,35 +86,11 @@ class TargetEnvWrapper:
         joint_angles_list = []
         gripper_width_list = []
         success = True
-
-        if ROBOT_POSE_DICT[robot_dataset][self.target_name]['safe_angle'] is not None:
-            self.target_env.set_robot_joint_positions(ROBOT_POSE_DICT[robot_dataset][self.target_name]['safe_angle'])
         
         for pose_index in range(num_robot_poses):
             target_pose=target_pose_array[pose_index].copy()
             target_pose[:3] -= robot_disp
             target_pose = reach_further(target_pose, distance=ROBOT_CAMERA_POSES_DICT[robot_dataset]["extend_gripper"])
-
-            # if target_pose_list:
-            #     prev_world = target_pose_list[-1][:3] - robot_disp
-            # else:
-            #     prev_world = target_pose[:3]
-
-            # delta = target_pose[:3] - prev_world
-            # dist  = np.abs(delta).sum()
-
-            # if dist > STEP_MAX:
-            #     n_sub = int(np.ceil(dist / STEP_MAX))
-            #     for s in range(1, n_sub + 1):
-            #         sub_pose = target_pose.copy()
-            #         sub_pose[:3] = prev_world + (s / n_sub) * delta
-            #         if ORI_LERP and n_sub > 1:
-            #             sub_pose[3:] = (
-            #                 (1 - s / n_sub) * target_pose_array[pose_index - 1][3:] +
-            #                 (s / n_sub)     * target_pose[3:]
-            #             )
-            #         self.target_env.drive_robot_to_target_pose(target_pose=sub_pose)
-
             _, gripper_dist = self.target_env.get_gripper_width_from_qpos()
             attempt = 0
             while (gripper_dist < gripper_array[pose_index] - 0.1 or gripper_dist > gripper_array[pose_index] + 0.1) and attempt < 10:
@@ -135,7 +108,7 @@ class TargetEnvWrapper:
 
             if unlimited == "False" and not target_reached:
                 print(f"episode {episode} pose {pose_index}")
-                blacklist_path = Path(f"{save_paired_images_folder_path}/{target_name}/blacklist.json")
+                blacklist_path = Path(f"{save_paired_images_folder_path}/{self.target_name}/blacklist.json")
                 with locked_json(blacklist_path) as blk:
                     robot_list = blk.setdefault(self.target_name, [])
                     if episode not in robot_list:
@@ -195,7 +168,7 @@ class TargetEnvWrapper:
                         print(f"\033[92m[BLACKLIST] Removed {self.target_name} – episode {episode}\033[0m")
 
                 whitelist_path = Path(f"{save_paired_images_folder_path}/{self.target_name}/whitelist.json")
-                with locked_json(whitelist_path) as wl:             # 🔒 独占锁
+                with locked_json(whitelist_path) as wl:
                     robot_list = wl.get(self.target_name, [])
                     if episode not in robot_list:
                         robot_list.append(episode)

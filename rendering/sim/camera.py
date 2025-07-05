@@ -33,33 +33,11 @@ class CameraWrapper:
     
     def set_camera_fov(self, fov=45.0):
         self.env.sim.model.cam_fovy[self.camera_id] = float(fov)
-        # for _ in range(50):
-        #     self.env.sim.forward()
-        #     self.env.sim.step()
-        #     self.env._update_observables()
     
     def set_camera_pose(self, pos, quat, offset=np.array([0, 0, 0])):
         # Robot base world coord: -0.6 0.0 0.912
         self.camera_mover.set_camera_pose(pos=pos + offset, quat=quat)
-        target_pose = np.concatenate((pos + offset, quat))
-        current_pose = self.get_camera_pose_world_frame()
-        error = compute_pose_error(current_pose, target_pose)
-
-        cid = self.env.sim.model.camera_name2id("agentview")
-        R   = self.env.sim.data.cam_xmat[cid].reshape(3, 3)
-
-        forward_world = -R[:, 2]   # –Z column
-        up_world      =  R[:, 1]   # +Y column
-
-        # for _ in range(50):
-        #     self.camera_mover.set_camera_pose(pos=pos + offset, quat=quat)
-        #     self.env.sim.forward()
-        #     self.env.sim.step()
-        #     self.env._update_observables()
-            
     
     def get_camera_pose_world_frame(self):
         camera_pos, camera_quat = self.camera_mover.get_camera_pose()
-        # world_camera_pose = T.make_pose(camera_pos, T.quat2mat(camera_quat))
-        # print("Camera pose in the world frame:", camera_pos, camera_quat)
         return np.concatenate((camera_pos, camera_quat))

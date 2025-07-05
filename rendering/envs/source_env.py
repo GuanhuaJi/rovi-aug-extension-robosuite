@@ -83,39 +83,17 @@ class SourceEnvWrapper:
                             joint_angles[left + k] = (1 - alpha) * joint_angles[left] + alpha * joint_angles[right]
                 print(f"[INFO] austin_buds: filled {zero_mask.sum()} zero rows via interpolation / copying.")
 
-        if self.robot_dataset == "can":
-            camera_reference_pose = np.array([0.9, 0.1, 1.75, 0.271, 0.271, 0.653, 0.653])
-            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
-            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
-        elif self.robot_dataset == "lift":
-            camera_reference_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
-            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
-            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
-        elif self.robot_dataset == "square":
-            camera_reference_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
-            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
-            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
-        elif self.robot_dataset == "stack":
-            camera_reference_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
-            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
-            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
-        elif self.robot_dataset == "three_piece_assembly":
-            camera_reference_pose = np.array([0.713078462147161, 2.062036796036723e-08, 1.5194726087166726, 0.293668270111084, 0.2936684489250183, 0.6432408690452576, 0.6432409286499023])
-            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
-            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
-
-        else:
-            for viewpoint in info["viewpoints"]:
-                if episode in viewpoint["episodes"]:
-                    camera_reference_position = viewpoint["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
-                    roll_deg = viewpoint["roll"]
-                    pitch_deg = viewpoint["pitch"]
-                    yaw_deg = viewpoint["yaw"]
-                    fov = viewpoint["camera_fov"]
-                    r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
-                    camera_reference_quaternion = r.as_quat()
-                    camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
-                    break
+        for viewpoint in info["viewpoints"]:
+            if episode in viewpoint["episodes"]:
+                camera_reference_position = viewpoint["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
+                roll_deg = viewpoint["roll"]
+                pitch_deg = viewpoint["pitch"]
+                yaw_deg = viewpoint["yaw"]
+                fov = viewpoint["camera_fov"]
+                r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
+                camera_reference_quaternion = r.as_quat()
+                camera_reference_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
+                break
         target_pose_list = []
         gripper_list = []
         num_frames = joint_angles.shape[0]
@@ -152,9 +130,7 @@ class SourceEnvWrapper:
         np.save(eef_npy_path, target_pose_array)
         print(f"{GREEN}✔ End effector saved under {eef_npy_path}{RESET}")
         npz_path = os.path.join(save_source_robot_states_path, f"{episode}.npz")
-        #np.savez(npz_path, pos=target_pose_array, grip=gripper_array)
         
-        #if no element of gripper_states is > 0.09, then divide each element by 0.08
         if self.source_name == "Panda":
             if np.all(gripper_array <= 0.09):
                 gripper_states = np.clip(gripper_array / 0.08, 0, 1)

@@ -34,7 +34,14 @@ def main():
                       num_ep * (args.partition + 1) // NUM_PARTS)
 
     for robot in args.target_robot:
-        gripper = meta["gripper"]
+        if robot == "Sawyer":
+            gripper = "RethinkGripper"
+        elif robot == "Jaco":
+            gripper = "JacoThreeFingerGripper"
+        elif robot == "IIWA" or robot == "UR5e" or robot == "Kinova3":
+            gripper = "Robotiq85Gripper"
+        elif robot == "Panda":
+            gripper = "PandaGripper"
         wrapper = TargetEnvWrapper(robot, gripper, args.robot_dataset,
                                    camera_height=H, camera_width=W)
 
