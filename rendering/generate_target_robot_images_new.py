@@ -7,8 +7,11 @@ import os, argparse, json, logging, multiprocessing as mp
 
 import numpy as np
 
+logger = logging.getLogger(__name__)
+
 from core import pick_best_gpu, locked_json
 from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
+from config.robot_pose_dict import ROBOT_POSE_DICT
 
 
 # ───────────────────────────── helpers ──────────────────────────────
@@ -48,15 +51,61 @@ def generate_one_episode(
             camera_width=W,
         )
 
-        succeed = wrapper.generate_image(   # ← 直接拿到 True / False
-            save_paired_images_folder_path=out_root,
-            source_robot_states_path=out_root,
-            robot_dataset=robot_dataset,
-            episode=episode,
-            unlimited=unlimited,
-            load_displacement=load_displacement,
+        if load_displacement:
+            off_file = Path(out_root) / "source_robot_states" / robot / "offsets" / f"{episode}.npy"
+            if off_file.is_file():
+                displacement = np.load(off_file)
+            else:
+                displacement = np.zeros(3, dtype=np.float32)
+                print(f"WARNING: displacement file not found → {off_file}; using default [0, 0, 0].")
+        else:
+            displacement = ROBOT_POSE_DICT[robot_dataset][robot]
+
+        logger.info(
+            "Episode %d robot %s initial displacement %s",
+            episode,
+            robot,
+            displacement,
         )
-        return robot, episode, bool(succeed)
+
+        success = False
+        suggestion = np.zeros(3)
+        max_attempts = 5
+        for attempt in range(1, max_attempts + 1):
+            success, suggestion = wrapper.generate_image(
+                save_paired_images_folder_path=out_root,
+                source_robot_states_path=out_root,
+                robot_dataset=robot_dataset,
+                robot_disp=displacement,
+                episode=episode,
+                unlimited=unlimited,
+            )
+            if success:
+                if attempt > 1:
+                    logger.info(
+                        "Episode %d robot %s succeeded after %d retries",
+                        episode,
+                        robot,
+                        attempt - 1,
+                    )
+                break
+            logger.warning(
+                "Episode %d robot %s attempt %d failed, suggestion %s",
+                episode,
+                robot,
+                attempt,
+                suggestion,
+            )
+            displacement += suggestion
+        else:
+            logger.error(
+                "Episode %d robot %s failed after %d attempts",
+                episode,
+                robot,
+                max_attempts,
+            )
+
+        return robot, episode, bool(success)
 
     except Exception as exc:
         logging.exception(
@@ -78,6 +127,11 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s:%(message)s",
+    )
 
     meta = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
     with open(Path(meta["replay_path"]) / "dataset_metadata.json", encoding="utf-8") as f:
