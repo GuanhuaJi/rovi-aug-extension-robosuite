@@ -54,12 +54,12 @@ def generate_one_episode(
         if load_displacement:
             off_file = Path(out_root) / "source_robot_states" / robot / "offsets" / f"{episode}.npy"
             if off_file.is_file():
-                displacement = np.load(off_file)
+                displacement = np.load(off_file).astype(np.float64, copy=False)   # ← force float64
             else:
-                displacement = np.zeros(3, dtype=np.float32)
+                displacement = np.zeros(3, dtype=np.float64)                      # ← float64 default
                 print(f"WARNING: displacement file not found → {off_file}; using default [0, 0, 0].")
         else:
-            displacement = ROBOT_POSE_DICT[robot_dataset][robot]
+            displacement = np.asarray(ROBOT_POSE_DICT[robot_dataset][robot], dtype=np.float64)
 
         logger.info(
             "Episode %d robot %s initial displacement %s",
@@ -214,7 +214,7 @@ def main() -> None:
     print("✓ all dispatched episodes finished")
 
 '''
-python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset austin_buds --target_robot Sawyer --num_workers 10 --load_displacement
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset austin_buds --target_robot Jaco --num_workers 10 --load_displacement
 '''
 
 if __name__ == "__main__":

@@ -109,38 +109,6 @@ class TargetEnvWrapper:
                     suggestion,
                 )
                 break
-                # blacklist_path = Path(f"{save_paired_images_folder_path}/{self.target_name}/blacklist.json")
-                # with locked_json(blacklist_path) as blk:
-                #     robot_list = blk.setdefault(self.target_name, [])
-                #     if episode not in robot_list:
-                #         robot_list.append(episode)
-                #         robot_list.sort()
-                #         RED   = "\033[91m"
-                #         RESET = "\033[0m"
-                #         print(f"{RED}[BLACKLIST] Added {self.target_name} – episode {episode}{RESET}")
-                # success = False
-                # try:
-                #     n = len(target_pose_list)
-                #     tgt_xy = target_pose_array[:, :2]
-                #     real_xy = np.array(target_pose_list)[:, :2] - robot_disp[:2]
-                #     fig, ax = plt.subplots(figsize=(4, 4))
-                #     ax.plot(tgt_xy[:, 0], tgt_xy[:, 1], "o-", label="target XY")
-                #     ax.plot(real_xy[:, 0], real_xy[:, 1], "x-", label="reached XY")
-                #     ax.set_xlabel("X (m)");  ax.set_ylabel("Y (m)")
-                #     ax.set_title(f"{self.target_name} – episode {episode} - offset {robot_disp.round(3)}")
-                #     ax.axis("equal");  ax.legend()
-                    
-                #     out_dir = os.path.join(save_paired_images_folder_path,
-                #                         f"{self.target_name}_traj_plots")
-                #     os.makedirs(out_dir, exist_ok=True)
-                #     out_file = os.path.join(out_dir, f"{episode}.png")
-                #     fig.savefig(out_file,
-                #                 dpi=150, bbox_inches="tight")
-                #     plt.close(fig)
-                #     print(f"\033[95m[TRAJ]  Saved XY plot for episode {episode}: {out_file}\033[0m")
-                # except Exception as e:
-                #     print(f"[WARN] could not save trajectory plot: {e}")
-                # break
             reached_pose = self.target_env.compute_eef_pose()
             reached_pose[:3] += robot_disp
             target_pose_list.append(reached_pose)
@@ -154,40 +122,27 @@ class TargetEnvWrapper:
             target_robot_img, target_robot_seg_img = self.target_env.get_observation_fast(white_background=True, width=self.camera_width, height=self.camera_height)
             mask_frames.append(target_robot_seg_img) 
             video_frames.append(target_robot_img)
-            # cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{self.target_name}_rgb", f"{episode}/{pose_index}.png"), cv2.cvtColor(target_robot_img, cv2.COLOR_RGB2BGR))
-            # cv2.imwrite(os.path.join(save_paired_images_folder_path, f"{self.target_name}_mask", f"{episode}/{pose_index}.png"), target_robot_seg_img * 255)
-        mask_frames_np = np.stack(mask_frames, axis=0).astype(np.uint8) * 255
-        video_frames_np = np.stack(video_frames, axis=0)
-        iio.imwrite(
-            mask_path,
-            mask_frames_np,
-            fps   = 30,
-            codec = "libx264"
-        )
-        iio.imwrite(
-            video_path,
-            video_frames_np,
-            fps   = 30,
-            codec = "libx264"
-        )
-        
-        if success:
+
+        if success:        
+            mask_frames_np = np.stack(mask_frames, axis=0).astype(np.uint8) * 255
+            video_frames_np = np.stack(video_frames, axis=0)
+            iio.imwrite(
+                mask_path,
+                mask_frames_np,
+                fps   = 30,
+                codec = "libx264"
+            )
+            iio.imwrite(
+                video_path,
+                video_frames_np,
+                fps   = 30,
+                codec = "libx264"
+            )
             if unlimited == False:
                 print(f"\033[92m[SUCCESS] Generated {self.target_name} – episode {episode}\033[0m")
             else:
                 print(f"\033[92m[UNLIMITED] Generated {self.target_name} – episode {episode}\033[0m")
 
-            # target_pose_array = np.vstack(target_pose_list)
-            # joint_angles_array = np.vstack(joint_angles_list)
-            # gripper_width_array = np.array(gripper_width_list)
-            # eef_npy_path = os.path.join(save_paired_images_folder_path, "source_robot_states", f"{self.target_name}", "end_effector", f"{episode}.npy")
-            # np.save(eef_npy_path, target_pose_array)
-            # gripper_npy_path = os.path.join(save_paired_images_folder_path, "source_robot_states", f"{self.target_name}", "gripper_distance", f"{episode}.npy")
-            # np.save(gripper_npy_path, gripper_width_array)
-            # joint_angles_npy_path = os.path.join(save_paired_images_folder_path, "source_robot_states", f"{self.target_name}", "joint_angles", f"{episode}.npy")
-            # np.save(joint_angles_npy_path, joint_angles_array)
-            # offset_npy_path = os.path.join(save_paired_images_folder_path, "source_robot_states", f"{self.target_name}", "offsets", f"{episode}.npy")
-            # np.save(offset_npy_path, robot_disp)
             os.makedirs(os.path.join(save_paired_images_folder_path, "target_robot_states", f"{self.target_name}"), exist_ok=True)
             target_pose_array   = np.vstack(target_pose_list)
             joint_angles_array  = np.vstack(joint_angles_list)
