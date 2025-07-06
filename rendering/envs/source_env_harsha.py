@@ -20,8 +20,6 @@ class SourceEnvWrapper:
     def get_source_robot_states(self, gripper_states=None, joint_angles=None, ee_states=None, episode=0, save_source_robot_states_path="paired_images"):
         if joint_angles is None and ee_states is None:
             raise ValueError("Either joint_angles or ee_states must be provided.")
-        if joint_angle is not None:
-
 
         info = ROBOT_CAMERA_POSES_DICT[self.robot_dataset]
         if self.robot_dataset == "ucsd_kitchen_rlds" or self.robot_dataset == "utokyo_pick_and_place":
