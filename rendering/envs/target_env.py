@@ -7,12 +7,15 @@ from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
 from config.robot_pose_dict import ROBOT_POSE_DICT
 from core import locked_json, atomic_write_json
 import matplotlib
+import logging
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 import cv2
 from pathlib import Path
 import imageio.v3 as iio
+
+logger = logging.getLogger(__name__)
 
 STEP_MAX = 0.02          # 单帧允许的最大 L1 位移（米），1 cm
 ORI_LERP = False
@@ -24,14 +27,15 @@ class TargetEnvWrapper:
         self.camera_height = camera_height
         self.camera_width = camera_width
     
-    def generate_image(self, 
-                        save_paired_images_folder_path="paired_images", 
-                        displacement_csv_path=None,
-                        source_robot_states_path="paired_images",
-                        robot_dataset=None, 
-                        unlimited=False,
-                        load_displacement=False,
-                        episode=0):
+    def generate_image(
+        self,
+        save_paired_images_folder_path="paired_images",
+        source_robot_states_path="paired_images",
+        robot_dataset=None,
+        robot_disp=None,
+        unlimited=False,
+        episode=0,
+    ):
         data = np.load(os.path.join(source_robot_states_path, "source_robot_states", f"{episode}.npz"), allow_pickle=True)
         info = ROBOT_CAMERA_POSES_DICT[robot_dataset]
         target_pose_array = data['pos'].copy()
@@ -48,17 +52,7 @@ class TargetEnvWrapper:
                 camera_reference_quaternion = r.as_quat()
                 camera_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
                 break
-        robot_disp = None
-
-        if load_displacement:
-            offset_file = os.path.join(source_robot_states_path, "source_robot_states", self.target_name, "offsets", f"{episode}.npy")
-            if os.path.isfile(offset_file):
-                robot_disp = np.load(offset_file)
-            else:
-                robot_disp = np.zeros(3, dtype=np.float32)
-                print(f"WARNING: displacement file not found → {offset_file}; "
-                    f"using default [0, 0, 0].")
-        else:
+        if robot_disp is None:
             robot_disp = ROBOT_POSE_DICT[robot_dataset][self.target_name]
 
         camera_pose[:3] -= robot_disp
@@ -85,6 +79,7 @@ class TargetEnvWrapper:
         video_path = video_dir / f"{episode}.mp4"
         mask_frames = []
         video_frames = []
+        suggestion = np.zeros(3)
         for pose_index in range(num_robot_poses):
             target_pose=target_pose_array[pose_index].copy()
             target_pose[:3] -= robot_disp
@@ -106,6 +101,13 @@ class TargetEnvWrapper:
 
             if unlimited == False and not target_reached:
                 success = False
+                suggestion = target_reached_pose[:3] - target_pose[:3]
+                logger.debug(
+                    "Episode %s failed at pose %s; suggestion %s",
+                    episode,
+                    pose_index,
+                    suggestion,
+                )
                 break
                 # blacklist_path = Path(f"{save_paired_images_folder_path}/{self.target_name}/blacklist.json")
                 # with locked_json(blacklist_path) as blk:
@@ -204,7 +206,14 @@ class TargetEnvWrapper:
                 gripper_width = gripper_width_array,
                 offsets       = offset_array,
             )
-            return success
+            logger.debug("Episode %s success with displacement %s", episode, robot_disp)
+            return success, suggestion
         else:
             print(f"\033[91m[FAILURE] Could not reach target pose for {self.target_name} – episode {episode}\033[0m")
-            return False
+            logger.debug(
+                "Episode %s failed with displacement %s, suggestion %s",
+                episode,
+                robot_disp,
+                suggestion,
+            )
+            return False, suggestion
