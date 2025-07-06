@@ -147,6 +147,9 @@ def main() -> None:
     for robot in args.target_robot:
         wl_path = out_root / robot / "whitelist.json"
         wl_path.parent.mkdir(parents=True, exist_ok=True)
+
+        bl_path = out_root / robot / "blacklist.json"
+        bl_path.parent.mkdir(parents=True, exist_ok=True)
         with locked_json(wl_path) as wl:
             done_eps = set(wl.get(robot, []))
 
@@ -170,13 +173,43 @@ def main() -> None:
 
     with ProcessPoolExecutor(max_workers=args.num_workers, mp_context=mp_ctx) as pool:
         futures = [pool.submit(generate_one_episode, *t) for t in tasks]
+        with locked_json(wl_path) as wl:
+            done_eps = set(wl.setdefault(robot, []))   # setdefault 会在文件新建时写入 []
+
+        # ---------- 任务执行结束：写入白/黑名单 ----------
         for fut in as_completed(futures):
             robot, ep, ok = fut.result()
-            if not ok:
-                continue
+
             wl_path = out_root / robot / "whitelist.json"
-            with locked_json(wl_path) as wl:
-                wl.setdefault(robot, []).append(ep)
+            bl_path = out_root / robot / "blacklist.json"
+
+            if ok:
+                # 1) 写白名单
+                with locked_json(wl_path) as wl:
+                    eps = set(wl.setdefault(robot, []))
+                    eps.add(ep)
+                    wl[robot] = sorted(eps)
+
+                # 2) 从黑名单删除
+                with locked_json(bl_path) as bl:
+                    eps = set(bl.setdefault(robot, []))
+                    if ep in eps:
+                        eps.remove(ep)
+                        bl[robot] = sorted(eps)
+
+            else:
+                # 1) 写黑名单
+                with locked_json(bl_path) as bl:
+                    eps = set(bl.setdefault(robot, []))
+                    eps.add(ep)
+                    bl[robot] = sorted(eps)
+
+                # 2) 从白名单删除
+                with locked_json(wl_path) as wl:
+                    eps = set(wl.setdefault(robot, []))
+                    if ep in eps:
+                        eps.remove(ep)
+                        wl[robot] = sorted(eps)
 
     print("✓ all dispatched episodes finished")
 
