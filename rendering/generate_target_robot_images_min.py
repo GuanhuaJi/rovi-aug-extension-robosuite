@@ -4,6 +4,8 @@ from pathlib import Path
 from envs import TargetEnvWrapper
 from core import pick_best_gpu, locked_json
 from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
+import json
+import imageio.v3 as iio
 
 '''
 python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_min.py --robot_dataset austin_buds --target_robot Sawyer --partition 0 --load_displacement
@@ -23,13 +25,16 @@ def main():
     args = parse_args()
     pick_best_gpu()
 
-    meta = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
-    H, W = meta["camera_height"], meta["camera_width"]
-    out_root = Path(meta["replay_path"])
+    user_meta = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
+    meta_path = Path(user_meta["replay_path"]) / "dataset_metadata.json"
+    with meta_path.open("r", encoding="utf-8") as f:
+        dataset_meta = json.load(f)
+    H, W = dataset_meta["image_height"], dataset_meta["image_width"]
+    out_root = Path(user_meta["replay_path"])
 
     # episode 分区逻辑
     NUM_PARTS = 20
-    num_ep    = meta["num_episodes"]
+    num_ep    = dataset_meta["num_episodes"]
     episodes  = range(num_ep * args.partition // NUM_PARTS,
                       num_ep * (args.partition + 1) // NUM_PARTS)
 

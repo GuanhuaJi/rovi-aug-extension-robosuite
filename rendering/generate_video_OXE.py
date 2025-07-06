@@ -148,7 +148,8 @@ def main():
             futures = [
                 pool.submit(episode_task, ds, ep)
                 for ds in robot_datasets
-                for ep in range(ROBOT_CAMERA_POSES_DICT[ds]["num_episodes"])
+                #for ep in range(ROBOT_CAMERA_POSES_DICT[ds]["num_episodes"])
+                for ep in range(2)
             ]
 
             # 逐个 wait；内部异常不会抛到这里

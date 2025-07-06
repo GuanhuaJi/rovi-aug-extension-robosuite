@@ -41,9 +41,15 @@ def main() -> None:
 
     # ── dataset-specific meta info ────────────────────────────────────
     meta          = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
+    proc_fn     = meta["processing_function"]
     replay_path   = Path(meta["replay_path"])
     out_dir       = replay_path / "source_robot_states"
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    if not callable(proc_fn):
+        raise ValueError(f"`processing_function` for "
+                         f"{args.robot_dataset} is not callable: "
+                         f"{repr(proc_fn)}")
 
     # ── episode range for this partition ──────────────────────────────
     num_ep       = meta["num_episodes"]

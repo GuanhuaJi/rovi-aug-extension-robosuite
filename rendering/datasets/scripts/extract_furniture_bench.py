@@ -35,7 +35,7 @@ def dataset2path(dataset_name):
     根据实际存储情况，返回对应 GCS 或本地目录。
     以下只是示例，需根据真实路径修改。
     """
-    return f'gs://gresearch/robotics/{dataset_name}/0.1.0'
+    return f'gs://gresearch/robotics/furniture_bench_dataset_converted_externally_to_rlds/0.1.0'
 
 DATASET = "furniture_bench_dataset_converted_externally_to_rlds"
 

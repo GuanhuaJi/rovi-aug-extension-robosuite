@@ -1,5 +1,5 @@
 import numpy as np
-
+import config.processing_episode as processing_episode
 
 ROBOT_CAMERA_POSES_DICT = {
     "austin_buds": {
@@ -15,13 +15,13 @@ ROBOT_CAMERA_POSES_DICT = {
         ],
         "inpaint_path": "/shared/projects/mirage2/final_inpainted_vids/austin_buds_dataset_converted_externally_to_rlds",
         "replay_path": "/home/abrashid/paired_images/austin_buds",
-        "camera_height": 128,
-        "camera_width": 128,
-        "num_episodes": 50,
+        "save_path": "/home/guanhuaji/mirage/robot2robot/rendering/paired_images/austin_buds",
         "robot": "Panda",
         "gripper": "PandaGripper",
         "extend_gripper": 0.0,
-        "binarized_gripper": False
+        "binarized_gripper": False,
+        "GCS_path": "gs://gresearch/robotics/austin_buds_dataset_converted_externally_to_rlds/0.1.0",
+        "processing_function": processing_episode.process_episode_austin_buds
     },
     "austin_sailor": {
         "viewpoints": [
@@ -42,7 +42,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "robot": "Panda",
         "gripper": "PandaGripper",
         "extend_gripper": 0.0,
-        "binarized_gripper": False
+        "binarized_gripper": False,
+        "GCS_path": "gs://gresearch/robotics/austin_sailor_dataset_converted_externally_to_rlds/0.1.0",
+        "processing_function": processing_episode.process_episode_austin_sailor
     },
     "autolab_ur5": {
         "viewpoints": [
@@ -64,7 +66,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "robot": "UR5e",
         "gripper": "Robotiq85Gripper",
         "extend_gripper": 0.0,
-        "binarized_gripper": True
+        "binarized_gripper": True,
+        "GCS_path": "gs://gresearch/robotics/berkeley_autolab_ur5/0.1.0",
+        "processing_function": processing_episode.process_episode_autolab_ur5
     },
     "austin_mutex": {
         "viewpoints": [
@@ -85,7 +89,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "robot": "Panda",
         "gripper": "PandaGripper",
         "extend_gripper": 0.0,
-        "binarized_gripper": False
+        "binarized_gripper": False,
+        "GCS_path": "gs://gresearch/robotics/utaustin_mutex/0.1.0",
+        "processing_function": processing_episode.process_episode_austin_mutex
     },   
     "nyu_franka": {
         "viewpoints": [
@@ -106,7 +112,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "robot": "Panda",
         "gripper": "PandaGripper",
         "extend_gripper": 0.0,
-        "binarized_gripper": True
+        "binarized_gripper": True,
+        "GCS_path": "gs://gresearch/robotics/nyu_franka_play_dataset_converted_externally_to_rlds/0.1.0",
+        "processing_function": processing_episode.process_episode_nyu_franka
     },
     "kaist": {
         "viewpoints": [
@@ -127,7 +135,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "robot": "Panda",
         "gripper": "PandaGripper",
         "extend_gripper": 0.0,
-        "binarized_gripper": False
+        "binarized_gripper": False,
+        "GCS_path": "gs://gresearch/robotics/kaist_nonprehensile_converted_externally_to_rlds/0.1.0",
+        "processing_function": processing_episode.process_episode_kaist
     },
     "toto": {
         "viewpoints": [
@@ -148,7 +158,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "robot": "Panda",
         "gripper": "PandaGripper",
         "extend_gripper": 0.0,
-        "binarized_gripper": True
+        "binarized_gripper": True,
+        "GCS_path": "gs://gresearch/robotics/toto/0.1.0",
+        "processing_function": processing_episode.process_episode_toto
     },
     "asu_table_top_rlds": {
         "viewpoints": [
@@ -168,7 +180,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "num_episodes": 110,
         "robot": "Panda",
         "gripper": "PandaGripper",
-        "extend_gripper": 0.0
+        "extend_gripper": 0.0,
+        "GCS_path": "gs://gresearch/robotics/asu_table_top_converted_externally_to_rlds/0.1.0",
+        "processing_function": processing_episode.process_episode_asu_table_top_rlds,
     },
     "ucsd_kitchen_rlds": {
         "viewpoints": [
@@ -189,7 +203,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "robot": "Panda",
         "gripper": "PandaGripper",
         "extend_gripper": 0.0,
-        "binarized_gripper": False
+        "binarized_gripper": False,
+        "GCS_path": "gs://gresearch/robotics/ucsd_kitchen_dataset_converted_externally_to_rlds/0.1.0",
+        "processing_function": processing_episode.process_episode_ucsd_kitchen_rlds
     },
     "utokyo_pick_and_place": {
         "viewpoints": [
@@ -210,7 +226,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "robot": "Panda",
         "gripper": "PandaGripper",
         "extend_gripper": 0.0,
-        "binarized_gripper": False
+        "binarized_gripper": False,
+        "GCS_path": "gs://gresearch/robotics/utokyo_xarm_pick_and_place_converted_externally_to_rlds/0.1.0",
+        "processing_function": processing_episode.process_episode_utokyo_pick_and_place
     },
     "taco_play": {
         "viewpoints": [
@@ -231,7 +249,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "robot": "Panda",
         "gripper": "PandaGripper",
         "extend_gripper": 0.0,
-        "binarized_gripper": True
+        "binarized_gripper": True,
+        "GCS_path": "gs://gresearch/robotics/taco_play/0.1.0",
+        "processing_function": processing_episode.process_episode_taco_play
     },
     "furniture_bench": {
         "viewpoints": [
@@ -252,7 +272,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "robot": "Panda",
         "gripper": "PandaGripper",
         "extend_gripper": 0.0,
-        "binarized_gripper": False
+        "binarized_gripper": False,
+        "GCS_path": "gs://gresearch/robotics/furniture_bench_dataset_converted_externally_to_rlds/0.1.0",
+        "processing_function": processing_episode.process_episode_furniture_bench
     },
     "viola": {
         "viewpoints": [
@@ -281,7 +303,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "robot": "Panda",
         "gripper": "PandaGripper",
         "extend_gripper": 0.08,
-        "binarized_gripper": False
+        "binarized_gripper": False,
+        "GCS_path": "gs://gresearch/robotics/viola/0.1.0",
+        "processing_function": processing_episode.process_episode_viola
     },
     "iamlab_cmu": {
         "viewpoints": [
@@ -310,7 +334,9 @@ ROBOT_CAMERA_POSES_DICT = {
         "robot": "Panda",
         "gripper": "PandaGripper",
         "extend_gripper": 0.08,
-        "binarized_gripper": True
+        "binarized_gripper": True,
+        "GCS_path": "gs://gresearch/robotics/iamlab_cmu_pickup_insert_converted_externally_to_rlds/0.1.0",
+        "processing_function": processing_episode.process_episode_iamlab_cmu
     },
     "can": {
         "replay_path": "/home/guanhuaji/mirage/robot2robot/rendering/paired_images/can",

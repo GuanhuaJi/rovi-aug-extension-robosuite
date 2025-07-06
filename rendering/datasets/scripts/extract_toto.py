@@ -35,7 +35,7 @@ def dataset2path(dataset_name):
     For example: return f'/path/to/{dataset_name}/0.1.0'
     or use a Google Cloud Storage path: 'gs://...'
     """
-    return f'gs://gresearch/robotics/{dataset_name}/0.1.0'
+    return f'gs://gresearch/robotics/toto/0.1.0'
 
 DATASET = "toto"  # The dataset name
 
