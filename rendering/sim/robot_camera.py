@@ -102,8 +102,8 @@ class RobotCameraWrapper:
         if error < max_threshold:
             return True, current_pose, error
         else:
-            print("Failed to drive robot to target pose")
-            print("SUGGESTION: ", target_pose - current_pose)
+            # print("Failed to drive robot to target pose")
+            # print("SUGGESTION: ", target_pose - current_pose)
             return False, current_pose, error
 
     def set_robot_joint_positions(self, joint_angles=None):
