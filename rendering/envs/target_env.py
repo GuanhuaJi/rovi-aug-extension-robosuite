@@ -7,7 +7,6 @@ from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
 from config.robot_pose_dict import ROBOT_POSE_DICT
 from core import locked_json, atomic_write_json
 import matplotlib
-import logging
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
@@ -15,7 +14,6 @@ import cv2
 from pathlib import Path
 import imageio.v3 as iio
 
-logger = logging.getLogger(__name__)
 
 STEP_MAX = 0.02          # 单帧允许的最大 L1 位移（米），1 cm
 ORI_LERP = False
@@ -35,6 +33,7 @@ class TargetEnvWrapper:
         robot_disp=None,
         unlimited=False,
         episode=0,
+        dry_run=False,
     ):
         data = np.load(os.path.join(source_robot_states_path, "source_robot_states", f"{episode}.npz"), allow_pickle=True)
         info = ROBOT_CAMERA_POSES_DICT[robot_dataset]
@@ -79,6 +78,14 @@ class TargetEnvWrapper:
         video_path = video_dir / f"{episode}.mp4"
         mask_frames = []
         video_frames = []
+        mask_path = video_path = None
+        if not dry_run:
+            mask_dir = Path(save_paired_images_folder_path) / f"{self.target_name}_replay_mask"
+            video_dir = Path(save_paired_images_folder_path) / f"{self.target_name}_replay_video"
+            mask_dir.mkdir(parents=True, exist_ok=True)
+            video_dir.mkdir(parents=True, exist_ok=True)
+            mask_path  = mask_dir / f"{episode}.mp4"
+            video_path = video_dir / f"{episode}.mp4"
         suggestion = np.zeros(3)
         for pose_index in range(num_robot_poses):
             target_pose=target_pose_array[pose_index].copy()
@@ -101,13 +108,7 @@ class TargetEnvWrapper:
 
             if unlimited == False and not target_reached:
                 success = False
-                suggestion = target_reached_pose[:3] - target_pose[:3]
-                logger.debug(
-                    "Episode %s failed at pose %s; suggestion %s",
-                    episode,
-                    pose_index,
-                    suggestion,
-                )
+                suggestion = target_pose[:3] - target_reached_pose[:3]
                 break
             reached_pose = self.target_env.compute_eef_pose()
             reached_pose[:3] += robot_disp
@@ -119,56 +120,64 @@ class TargetEnvWrapper:
             joint_angles_list.append(joint_angles)
 
 
-            target_robot_img, target_robot_seg_img = self.target_env.get_observation_fast(white_background=True, width=self.camera_width, height=self.camera_height)
-            mask_frames.append(target_robot_seg_img) 
-            video_frames.append(target_robot_img)
-
+            target_robot_img, target_robot_seg_img = self.target_env.get_observation_fast(
+                white_background=True,
+                width=self.camera_width,
+                height=self.camera_height,
+            )
+            if not dry_run:
+                mask_frames.append(target_robot_seg_img)
+                video_frames.append(target_robot_img)
         if success:        
-            mask_frames_np = np.stack(mask_frames, axis=0).astype(np.uint8) * 255
-            video_frames_np = np.stack(video_frames, axis=0)
-            iio.imwrite(
-                mask_path,
-                mask_frames_np,
-                fps   = 30,
-                codec = "libx264"
-            )
-            iio.imwrite(
-                video_path,
-                video_frames_np,
-                fps   = 30,
-                codec = "libx264"
-            )
+            if not dry_run:
+                mask_frames_np = np.stack(mask_frames, axis=0).astype(np.uint8) * 255
+                video_frames_np = np.stack(video_frames, axis=0)
+                iio.imwrite(
+                    mask_path,
+                    mask_frames_np,
+                    fps=30,
+                    codec="libx264",
+                )
+                iio.imwrite(
+                    video_path,
+                    video_frames_np,
+                    fps=30,
+                    codec="libx264",
+                )
             if unlimited == False:
                 print(f"\033[92m[SUCCESS] Generated {self.target_name} – episode {episode}\033[0m")
             else:
                 print(f"\033[92m[UNLIMITED] Generated {self.target_name} – episode {episode}\033[0m")
 
-            os.makedirs(os.path.join(save_paired_images_folder_path, "target_robot_states", f"{self.target_name}"), exist_ok=True)
-            target_pose_array   = np.vstack(target_pose_list)
-            joint_angles_array  = np.vstack(joint_angles_list)
-            gripper_width_array = np.asarray(gripper_width_list)
-            offset_array        = robot_disp
-            state_npz_path = os.path.join(
-                save_paired_images_folder_path,
-                "target_robot_states",
-                f"{self.target_name}",
-                f"{episode}.npz",
-            )
-            np.savez(
-                state_npz_path,
-                target_pose   = target_pose_array,
-                joint_angles  = joint_angles_array,
-                gripper_width = gripper_width_array,
-                offsets       = offset_array,
-            )
-            logger.debug("Episode %s success with displacement %s", episode, robot_disp)
-            return success, suggestion
+            if not dry_run:
+                os.makedirs(
+                    os.path.join(
+                        save_paired_images_folder_path,
+                        "target_robot_states",
+                        f"{self.target_name}",
+                    ),
+                    exist_ok=True,
+                )
+                target_pose_array = np.vstack(target_pose_list)
+                joint_angles_array = np.vstack(joint_angles_list)
+                gripper_width_array = np.asarray(gripper_width_list)
+                offset_array = robot_disp
+                state_npz_path = os.path.join(
+                    save_paired_images_folder_path,
+                    "target_robot_states",
+                    f"{self.target_name}",
+                    f"{episode}.npz",
+                )
+                np.savez(
+                    state_npz_path,
+                    target_pose=target_pose_array,
+                    joint_angles=joint_angles_array,
+                    gripper_width=gripper_width_array,
+                    offsets=offset_array,
+                )
+            steps = len(target_pose_list)
+            return success, suggestion, steps
         else:
             print(f"\033[91m[FAILURE] Could not reach target pose for {self.target_name} – episode {episode}\033[0m")
-            logger.debug(
-                "Episode %s failed with displacement %s, suggestion %s",
-                episode,
-                robot_disp,
-                suggestion,
-            )
-            return False, suggestion
+            steps = len(target_pose_list)
+            return False, suggestion, steps

@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # file: generate_target_robot_images_mp.py
-import argparse, json, logging, os
+import argparse, json, os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-import os, argparse, json, logging, multiprocessing as mp
+import os, argparse, json, multiprocessing as mp
 
 import numpy as np
-
-logger = logging.getLogger(__name__)
 
 from core import pick_best_gpu, locked_json
 from config.dataset_poses_dict import ROBOT_CAMERA_POSES_DICT
@@ -42,76 +40,93 @@ def generate_one_episode(
     from envs import TargetEnvWrapper
     H, W = camera_hw
     gripper = select_gripper(robot)
-    try:
-        wrapper = TargetEnvWrapper(
-            robot,
-            gripper,
-            robot_dataset,
-            camera_height=H,
-            camera_width=W,
-        )
+    wrapper = TargetEnvWrapper(
+        robot,
+        gripper,
+        robot_dataset,
+        camera_height=H,
+        camera_width=W,
+    )
 
-        if load_displacement:
-            off_file = Path(out_root) / "source_robot_states" / robot / "offsets" / f"{episode}.npy"
-            if off_file.is_file():
-                displacement = np.load(off_file).astype(np.float64, copy=False)   # ← force float64
-            else:
-                displacement = np.zeros(3, dtype=np.float64)                      # ← float64 default
-                print(f"WARNING: displacement file not found → {off_file}; using default [0, 0, 0].")
+    if load_displacement:
+        off_file = Path(out_root) / "source_robot_states" / robot / "offsets" / f"{episode}.npy"
+        if off_file.is_file():
+            displacement = np.load(off_file)
         else:
-            displacement = np.asarray(ROBOT_POSE_DICT[robot_dataset][robot], dtype=np.float64)
+            displacement = np.zeros(3, dtype=np.float32)
+            print(f"WARNING: displacement file not found → {off_file}; using default [0, 0, 0].")
+    else:
+        displacement = ROBOT_POSE_DICT[robot_dataset][robot]
 
-        logger.info(
-            "Episode %d robot %s initial displacement %s",
-            episode,
-            robot,
-            displacement,
+    def _try_disp(disp: np.ndarray):
+        """Return (ok, steps) for a candidate displacement."""
+        ok, _sug, steps = wrapper.generate_image(
+            save_paired_images_folder_path=out_root,
+            source_robot_states_path=out_root,
+            robot_dataset=robot_dataset,
+            robot_disp=disp,
+            episode=episode,
+            unlimited=unlimited,
+            dry_run=True,
+        )
+        return ok, steps
+
+    scales = [0.03, 0.1, 0.3]
+    best_disp = displacement.copy()
+    best_steps = -1
+
+    for step in scales:
+        found_success = False
+        offsets = np.array(
+            [
+                [dx, dy, dz]
+                for dx in (0, -step, step)
+                for dy in (0, -step, step)
+                for dz in (0, -step, step)
+            ],
+            dtype=np.float32,
         )
 
-        success = False
-        suggestion = np.zeros(3)
-        max_attempts = 5
-        for attempt in range(1, max_attempts + 1):
-            success, suggestion = wrapper.generate_image(
-                save_paired_images_folder_path=out_root,
-                source_robot_states_path=out_root,
-                robot_dataset=robot_dataset,
-                robot_disp=displacement,
-                episode=episode,
-                unlimited=unlimited,
+        np.random.shuffle(offsets)
+
+        for offset in offsets:
+            cand = best_disp + offset
+            print(
+                f"Testing displacement {cand} (step={step}) for episode {episode} robot {robot}",
+                flush=True,
             )
-            if success:
-                if attempt > 1:
-                    logger.info(
-                        "Episode %d robot %s succeeded after %d retries",
-                        episode,
-                        robot,
-                        attempt - 1,
-                    )
+            ok, steps = _try_disp(cand)
+            if ok:
+                best_disp = cand
+                best_steps = steps
+                found_success = True
                 break
-            logger.warning(
-                "Episode %d robot %s attempt %d failed, suggestion %s",
-                episode,
-                robot,
-                attempt,
-                suggestion,
-            )
-            displacement += suggestion
-        else:
-            logger.error(
-                "Episode %d robot %s failed after %d attempts",
-                episode,
-                robot,
-                max_attempts,
-            )
+            if steps > best_steps:
+                best_steps = steps
+                best_disp = cand
 
-        return robot, episode, bool(success)
+        # After scanning current grid, either we succeeded (so continue
+        # refining around the new centre) or we failed (so shrink step around
+        # the current best guess).
+        displacement = best_disp.copy()
+        if not found_success:
+            # Failed on this scale – keep current centre but continue with
+            # smaller step to search a finer neighbourhood.
+            continue
+        # If success, simply go to next (smaller) scale and search around the
+        # new centre (already updated above).
 
-    except Exception as exc:
-        logging.exception(
-            "Episode %s (robot=%s) failed: %s", episode, robot, exc, exc_info=True
-        )
-        return robot, episode, False
+    success, _sug, _ = wrapper.generate_image(
+        save_paired_images_folder_path=out_root,
+        source_robot_states_path=out_root,
+        robot_dataset=robot_dataset,
+        robot_disp=best_disp,
+        episode=episode,
+        unlimited=unlimited,
+        dry_run=False,
+    )
+
+    return robot, episode, bool(success)
 
 
 # ───────────────────────────── dispatcher ────────────────────────────
@@ -127,11 +142,6 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s:%(message)s",
-    )
 
     meta = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
     with open(Path(meta["replay_path"]) / "dataset_metadata.json", encoding="utf-8") as f:
@@ -174,9 +184,8 @@ def main() -> None:
     with ProcessPoolExecutor(max_workers=args.num_workers, mp_context=mp_ctx) as pool:
         futures = [pool.submit(generate_one_episode, *t) for t in tasks]
         with locked_json(wl_path) as wl:
-            done_eps = set(wl.setdefault(robot, []))   # setdefault 会在文件新建时写入 []
+            done_eps = set(wl.setdefault(robot, []))
 
-        # ---------- 任务执行结束：写入白/黑名单 ----------
         for fut in as_completed(futures):
             robot, ep, ok = fut.result()
 
@@ -184,13 +193,11 @@ def main() -> None:
             bl_path = out_root / robot / "blacklist.json"
 
             if ok:
-                # 1) 写白名单
                 with locked_json(wl_path) as wl:
                     eps = set(wl.setdefault(robot, []))
                     eps.add(ep)
                     wl[robot] = sorted(eps)
 
-                # 2) 从黑名单删除
                 with locked_json(bl_path) as bl:
                     eps = set(bl.setdefault(robot, []))
                     if ep in eps:
@@ -198,13 +205,11 @@ def main() -> None:
                         bl[robot] = sorted(eps)
 
             else:
-                # 1) 写黑名单
                 with locked_json(bl_path) as bl:
                     eps = set(bl.setdefault(robot, []))
                     eps.add(ep)
                     bl[robot] = sorted(eps)
 
-                # 2) 从白名单删除
                 with locked_json(wl_path) as wl:
                     eps = set(wl.setdefault(robot, []))
                     if ep in eps:
@@ -214,7 +219,7 @@ def main() -> None:
     print("✓ all dispatched episodes finished")
 
 '''
-python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset austin_buds --target_robot Jaco --num_workers 10 --load_displacement
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset nyu_franka --target_robot Jaco --num_workers 10 --load_displacement
 '''
 
 if __name__ == "__main__":
