@@ -26,6 +26,28 @@ def select_gripper(robot: str) -> str:
     raise ValueError(f"Unknown robot {robot!r}")
 
 
+def log_offsets(
+    out_root: Path,
+    robot: str,
+    episode: int,
+    tried: list[np.ndarray],
+    working: np.ndarray,
+) -> None:
+    """Append displacement search info for one episode to a JSON file."""
+    log_path = out_root / "target_robot_states" / f"{robot}_displacement.json"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    if not log_path.exists():
+        log_path.write_text("[]")
+    with locked_json(log_path, default=list) as hist:
+        hist.append(
+            {
+                "episode": int(episode),
+                "tried_offsets": [o.tolist() for o in tried],
+                "working_offset": working.tolist(),
+            }
+        )
+
+
 def generate_one_episode(
     robot_dataset: str,
     robot: str,
@@ -74,6 +96,7 @@ def generate_one_episode(
     scales = [0.03, 0.1, 0.3]
     best_disp = displacement.copy()
     best_steps = -1
+    tried: list[np.ndarray] = []
 
     for step in scales:
         found_success = False
@@ -91,6 +114,7 @@ def generate_one_episode(
 
         for offset in offsets:
             cand = best_disp + offset
+            tried.append(cand.copy())
             print(
                 f"Testing displacement {cand} (step={step}) for episode {episode} robot {robot}",
                 flush=True,
@@ -125,6 +149,8 @@ def generate_one_episode(
         unlimited=unlimited,
         dry_run=False,
     )
+
+    log_offsets(Path(out_root), robot, episode, tried, best_disp)
 
     return robot, episode, bool(success)
 
