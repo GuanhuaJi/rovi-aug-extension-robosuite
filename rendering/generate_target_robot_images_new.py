@@ -82,6 +82,13 @@ def generate_one_episode(
 
     def _try_disp(disp: np.ndarray):
         """Return (ok, steps) for a candidate displacement."""
+        wrapper = TargetEnvWrapper(
+            robot,
+            gripper,
+            robot_dataset,
+            camera_height=H,
+            camera_width=W,
+        )
         ok, _sug, steps = wrapper.generate_image(
             save_paired_images_folder_path=out_root,
             source_robot_states_path=out_root,
@@ -91,6 +98,7 @@ def generate_one_episode(
             unlimited=unlimited,
             dry_run=True,
         )
+        wrapper.target_env.env.close_renderer()
         return ok, steps
 
     scales = [0.03, 0.1, 0.3]
@@ -109,8 +117,6 @@ def generate_one_episode(
             ],
             dtype=np.float32,
         )
-
-        np.random.shuffle(offsets)
 
         for offset in offsets:
             cand = best_disp + offset
@@ -137,9 +143,18 @@ def generate_one_episode(
             # Failed on this scale – keep current centre but continue with
             # smaller step to search a finer neighbourhood.
             continue
+        else:
+            break
         # If success, simply go to next (smaller) scale and search around the
         # new centre (already updated above).
 
+    wrapper = TargetEnvWrapper(
+        robot,
+        gripper,
+        robot_dataset,
+        camera_height=H,
+        camera_width=W,
+    )
     success, _sug, _ = wrapper.generate_image(
         save_paired_images_folder_path=out_root,
         source_robot_states_path=out_root,
@@ -149,6 +164,7 @@ def generate_one_episode(
         unlimited=unlimited,
         dry_run=False,
     )
+    wrapper.target_env.env.close_renderer()
 
     log_offsets(Path(out_root), robot, episode, tried, best_disp)
 
@@ -245,7 +261,7 @@ def main() -> None:
     print("✓ all dispatched episodes finished")
 
 '''
-python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset nyu_franka --target_robot Jaco --num_workers 10 --load_displacement
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset ucsd_kitchen_rlds --target_robot IIWA --num_workers 10
 '''
 
 if __name__ == "__main__":
