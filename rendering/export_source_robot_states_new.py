@@ -165,4 +165,5 @@ if __name__ == "__main__":
 
 '''
 python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states_new.py --robot_dataset=ucsd_kitchen_rlds --workers=20 --chunksize=40
+python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states_new.py --robot_dataset=nyu_franka --workers=20 --chunksize=40
 '''

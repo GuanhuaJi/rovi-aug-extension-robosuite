@@ -262,6 +262,7 @@ def main() -> None:
 
 '''
 python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset ucsd_kitchen_rlds --target_robot IIWA --num_workers 10
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset nyu_franka --target_robot Sawyer --num_workers 10
 '''
 
 if __name__ == "__main__":
