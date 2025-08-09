@@ -339,7 +339,7 @@ ROBOT_CAMERA_POSES_DICT = {
         "processing_function": processing_episode.process_episode_iamlab_cmu
     },
     "can": {
-        "replay_path": "/home/guanhuaji/mirage/robot2robot/rendering/paired_images/can",
+        "replay_path": "./paired_images/can",
         "camera_height": 84,
         "camera_width": 84,
         "robot": "Panda",
@@ -348,7 +348,7 @@ ROBOT_CAMERA_POSES_DICT = {
         "num_episodes": 200,
     },
     "lift": {
-        "replay_path": "/home/guanhuaji/mirage/robot2robot/rendering/paired_images/lift",
+        "replay_path": "./paired_images/lift",
         "camera_height": 84,
         "camera_width": 84,
         "robot": "Panda",
@@ -356,7 +356,7 @@ ROBOT_CAMERA_POSES_DICT = {
         "extend_gripper": 0.0
     },
     "square": {
-        "replay_path": "/home/guanhuaji/mirage/robot2robot/rendering/paired_images/square",
+        "replay_path": "./paired_images/square",
         "camera_height": 84,
         "camera_width": 84,
         "robot": "Panda",
@@ -364,7 +364,7 @@ ROBOT_CAMERA_POSES_DICT = {
         "extend_gripper": 0.0
     },
     "stack": {
-        "replay_path": "/home/guanhuaji/mirage/robot2robot/rendering/paired_images/stack",
+        "replay_path": "./paired_images/stack",
         "camera_height": 84,
         "camera_width": 84,
         "robot": "Panda",
@@ -372,7 +372,7 @@ ROBOT_CAMERA_POSES_DICT = {
         "extend_gripper": 0.0
     },
     "three_piece_assembly": {
-        "replay_path": "/home/guanhuaji/mirage/robot2robot/rendering/paired_images/three_piece_assembly",
+        "replay_path": "./paired_images/three_piece_assembly",
         "camera_height": 84,
         "camera_width": 84,
         "robot": "Panda",
