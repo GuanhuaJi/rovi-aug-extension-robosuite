@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # file: generate_target_robot_images_mp.py
-import argparse, json, os
+import argparse
+import json
+import multiprocessing as mp
+import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-import os, argparse, json, multiprocessing as mp
 
 import numpy as np
 
@@ -37,7 +39,7 @@ def log_offsets(
     log_path = out_root / "target_robot_states" / f"{robot}_displacement.json"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     if not log_path.exists():
-        log_path.write_text("[]")
+        log_path.write_text("[]", encoding="utf-8")
     with locked_json(log_path, default=list) as hist:
         hist.append(
             {
@@ -48,6 +50,7 @@ def log_offsets(
         )
 
 
+# ───────────────────────── single-episode worker ────────────────────
 def generate_one_episode(
     robot_dataset: str,
     robot: str,
@@ -56,30 +59,45 @@ def generate_one_episode(
     out_root: str | os.PathLike,
     unlimited: bool = False,
     load_displacement: bool = False,
+    autosearch: bool = False,  # NEW
 ) -> tuple[str, int, bool]:
+    """
+    Render one episode for a target robot, optionally searching over
+    displacement. Returns (robot, episode, success).
+    """
     pick_best_gpu()
     os.environ["MUJOCO_GL"] = "egl"
-    from envs import TargetEnvWrapper
+
+    from envs import TargetEnvWrapper  # local import to keep fork-safety
+
     H, W = camera_hw
     gripper = select_gripper(robot)
-    wrapper = TargetEnvWrapper(
-        robot,
-        gripper,
-        robot_dataset,
-        camera_height=H,
-        camera_width=W,
-    )
 
-    if load_displacement:
-        off_file = Path(out_root) / "source_robot_states" / robot / "offsets" / f"{episode}.npy"
-        if off_file.is_file():
-            displacement = np.load(off_file)
-        else:
-            displacement = np.zeros(3, dtype=np.float32)
-            print(f"WARNING: displacement file not found → {off_file}; using default [0, 0, 0].")
+    # ───────────── decide starting displacement ─────────────
+    if autosearch:
+        displacement = np.zeros(3, dtype=np.float32)
+        displacement = np.array([0.2, 0.0, 0.0])
     else:
-        displacement = ROBOT_POSE_DICT[robot_dataset][robot]
+        if load_displacement:
+            off_file = (
+                Path(out_root)
+                / "source_robot_states"
+                / robot
+                / "offsets"
+                / f"{episode}.npy"
+            )
+            displacement = (
+                np.load(off_file) if off_file.is_file() else np.zeros(3, np.float32)
+            )
+            if not off_file.is_file():
+                print(
+                    f"WARNING: displacement file not found → {off_file}; "
+                    "using default [0, 0, 0]."
+                )
+        else:
+            displacement = ROBOT_POSE_DICT[robot_dataset][robot]
 
+    # ───────────── helper for dry-run image gen ─────────────
     def _try_disp(disp: np.ndarray):
         """Return (ok, steps) for a candidate displacement."""
         wrapper = TargetEnvWrapper(
@@ -89,7 +107,7 @@ def generate_one_episode(
             camera_height=H,
             camera_width=W,
         )
-        ok, _sug, steps = wrapper.generate_image(
+        ok, _suggested, steps = wrapper.generate_image(
             save_paired_images_folder_path=out_root,
             source_robot_states_path=out_root,
             robot_dataset=robot_dataset,
@@ -98,56 +116,57 @@ def generate_one_episode(
             unlimited=unlimited,
             dry_run=True,
         )
+        print(f"Displacement {disp} for episode {episode} robot {robot} → ok={ok}")
         wrapper.target_env.env.close_renderer()
         return ok, steps
 
-    scales = [0.03, 0.1, 0.3]
-    best_disp = displacement.copy()
-    best_steps = -1
+    # ───────────── optional grid search ─────────────
     tried: list[np.ndarray] = []
+    best_disp = displacement.copy()
 
-    for step in scales:
-        found_success = False
-        offsets = np.array(
-            [
-                [dx, dy, dz]
-                for dx in (0, -step, step)
-                for dy in (0, -step, step)
-                for dz in (0, -step, step)
-            ],
-            dtype=np.float32,
-        )
+    if autosearch:
+        best_steps = -1
+        scales = [0.03, 0.1, 0.3]
 
-        for offset in offsets:
-            cand = best_disp + offset
-            tried.append(cand.copy())
-            print(
-                f"Testing displacement {cand} (step={step}) for episode {episode} robot {robot}",
-                flush=True,
+        for step in scales:
+            found_success = False
+            offsets = np.array(
+                [
+                    [dx, dy, dz]
+                    for dx in (0, -step, step)
+                    for dy in (0, -step, step)
+                    for dz in (0, -step, step)
+                ],
+                dtype=np.float32,
             )
-            ok, steps = _try_disp(cand)
-            if ok:
-                best_disp = cand
-                best_steps = steps
-                found_success = True
+
+            for offset in offsets:
+                cand = best_disp + offset
+                tried.append(cand.copy())
+                print(
+                    f"Testing displacement {cand} (step={step}) "
+                    f"for episode {episode} robot {robot}",
+                    flush=True,
+                )
+                ok, steps = _try_disp(cand)
+                if ok:
+                    best_disp = cand
+                    best_steps = steps
+                    found_success = True
+                    break
+                if steps > best_steps:
+                    best_steps = steps
+                    best_disp = cand
+
+            # refine or stop depending on success
+            displacement = best_disp.copy()
+            if found_success:
                 break
-            if steps > best_steps:
-                best_steps = steps
-                best_disp = cand
+    else:
+        # No search: just record the single attempt
+        tried.append(best_disp.copy())
 
-        # After scanning current grid, either we succeeded (so continue
-        # refining around the new centre) or we failed (so shrink step around
-        # the current best guess).
-        displacement = best_disp.copy()
-        if not found_success:
-            # Failed on this scale – keep current centre but continue with
-            # smaller step to search a finer neighbourhood.
-            continue
-        else:
-            break
-        # If success, simply go to next (smaller) scale and search around the
-        # new centre (already updated above).
-
+    # ───────────── final (non-dry) render ─────────────
     wrapper = TargetEnvWrapper(
         robot,
         gripper,
@@ -155,7 +174,7 @@ def generate_one_episode(
         camera_height=H,
         camera_width=W,
     )
-    success, _sug, _ = wrapper.generate_image(
+    success, _suggested, _ = wrapper.generate_image(
         save_paired_images_folder_path=out_root,
         source_robot_states_path=out_root,
         robot_dataset=robot_dataset,
@@ -172,6 +191,12 @@ def generate_one_episode(
 
 
 # ───────────────────────────── dispatcher ────────────────────────────
+def _ensure_json_file(path: Path) -> None:
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--robot_dataset", required=True)
@@ -179,6 +204,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--num_workers", type=int, default=8)
     p.add_argument("--unlimited", action="store_true")
     p.add_argument("--load_displacement", action="store_true")
+    p.add_argument(
+        "--autosearch",
+        action="store_true",
+        help="Enable grid-search for best displacement. "
+        "If omitted, the script renders with (0,0,0) displacement only.",
+    )
     return p.parse_args()
 
 
@@ -195,13 +226,14 @@ def main() -> None:
 
     mp_ctx = mp.get_context("spawn")
 
+    # Build task list
     tasks = []
     for robot in args.target_robot:
         wl_path = out_root / robot / "whitelist.json"
-        wl_path.parent.mkdir(parents=True, exist_ok=True)
-
         bl_path = out_root / robot / "blacklist.json"
-        bl_path.parent.mkdir(parents=True, exist_ok=True)
+        _ensure_json_file(wl_path)
+        _ensure_json_file(bl_path)
+
         with locked_json(wl_path) as wl:
             done_eps = set(wl.get(robot, []))
 
@@ -216,6 +248,7 @@ def main() -> None:
                         str(out_root),
                         args.unlimited,
                         args.load_displacement,
+                        args.autosearch,  # NEW
                     )
                 )
 
@@ -223,11 +256,11 @@ def main() -> None:
         print("Nothing to do – all episodes already processed.")
         return
 
+    # Submit to process pool
     with ProcessPoolExecutor(max_workers=args.num_workers, mp_context=mp_ctx) as pool:
         futures = [pool.submit(generate_one_episode, *t) for t in tasks]
-        with locked_json(wl_path) as wl:
-            done_eps = set(wl.setdefault(robot, []))
 
+        # We update whitelist/blacklist incrementally as tasks finish
         for fut in as_completed(futures):
             robot, ep, ok = fut.result()
 
@@ -245,7 +278,6 @@ def main() -> None:
                     if ep in eps:
                         eps.remove(ep)
                         bl[robot] = sorted(eps)
-
             else:
                 with locked_json(bl_path) as bl:
                     eps = set(bl.setdefault(robot, []))
@@ -260,9 +292,28 @@ def main() -> None:
 
     print("✓ all dispatched episodes finished")
 
+
+# ─────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    main()
+
+
 '''
 python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset ucsd_kitchen_rlds --target_robot IIWA --num_workers 10
-python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset nyu_franka --target_robot Sawyer --num_workers 10
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset nyu_franka --target_robot Panda --num_workers 10
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset toto --target_robot Panda --num_workers 20
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset autolab_ur5 --target_robot UR5e --num_workers 20
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset viola --target_robot Panda --num_workers 20
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset austin_mutex --target_robot Panda --num_workers 20
+
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset can --target_robot IIWA --num_workers 1
+
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset lift --target_robot IIWA Sawyer Kinova3 Jaco UR5e Panda --num_workers 10
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset lift --target_robot Panda --num_workers 10
+
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset square --target_robot IIWA Sawyer Kinova3 Jaco UR5e Panda --num_workers 10
+python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images_new.py --robot_dataset stack --target_robot Panda UR5e --num_workers 30
+
 '''
 
 if __name__ == "__main__":

@@ -608,8 +608,8 @@ if __name__ == "__main__":
     
     if args.robot_dataset is not None:
         robot_dataset_info = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
-        camera_height = robot_dataset_info["camera_heights"]
-        camera_width = robot_dataset_info["camera_widths"]
+        camera_height = robot_dataset_info["camera_height"]
+        camera_width = robot_dataset_info["camera_width"]
     else:
         camera_height = 256
         camera_width = 256
@@ -620,6 +620,7 @@ if __name__ == "__main__":
 
     '''
     conda activate mirage
+    python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset can
     python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset kaist
     python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset ucsd_kitchen_rlds
     python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states.py --robot_dataset utokyo_pick_and_place

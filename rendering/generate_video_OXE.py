@@ -120,6 +120,7 @@ ROBOTS = {
     "autolab_ur5": ["Sawyer", "IIWA", "Jaco", "Kinova3"],
     "ucsd_kitchen_rlds": ["Sawyer", "IIWA", "Jaco", "Kinova3"],
     "utokyo_pick_and_place": ["Sawyer", "IIWA", "Jaco", "Kinova3"],
+    "can": ["Sawyer", "IIWA", "Jaco", "Kinova3", "UR5e"]
 }
 def episode_task(dataset: str, ep: int):
     # 针对数据集选择机器人列表
@@ -170,3 +171,12 @@ def main():
 # ──────────────────────────── 入口 ────────────────────────────
 if __name__ == "__main__":
     main()
+
+'''
+source_dir = /home/guanhuaji/mirage/robot2robot/rendering/paired_images/can
+for each robot in "Sawyer", "Jaco", "Kinova3", "IIWA", "UR5e":
+    for episode in range 0-200:
+        load bg video from {source_dir}/original_oxe_videos/{episode}/inpaint_e2fgvi.mp4
+        load mask from {source_dir}/{robot}_replay_mask/{episode}.mp4
+        load rgb from {source_dir}/{robot}_replay_video/{episode}.mp4
+        overlay the masked region of rgb onto bg and save as {source_dir}/{robot}_overlay/{episode}.mp4

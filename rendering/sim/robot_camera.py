@@ -68,7 +68,7 @@ class RobotCameraWrapper:
             self.env.sim.data.qvel[qpos_addr] = 0.0
         self.env.sim.forward()
 
-    def drive_robot_to_target_pose(self, target_pose=None, min_threshold=0.003, max_threshold=0.01, num_iter_max=100):
+    def drive_robot_to_target_pose(self, target_pose=None, min_threshold=0.003, max_threshold=0.02, num_iter_max=100):
         self.env.robots[0].controller.use_delta = False # change to absolute pose for setting the initial state
         assert len(target_pose) == 7, "Target pose should be 7DOF"
         current_pose = self.compute_eef_pose()

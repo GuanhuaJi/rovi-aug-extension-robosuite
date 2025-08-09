@@ -1,6 +1,7 @@
 import os
 import tensorflow as tf
 import numpy as np
+import math
 
 def _expand_flag(flag_bool):
     """bool (T,) → float32 (T,1)"""

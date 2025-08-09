@@ -2,7 +2,7 @@ import numpy as np
 import config.processing_episode as processing_episode
 
 ROBOT_CAMERA_POSES_DICT = {
-    "austin_buds": {
+    "austin_buds": { #full name
         "viewpoints": [
             {
                 "camera_position": np.array([0.97,0.065,0.78]),
@@ -20,7 +20,7 @@ ROBOT_CAMERA_POSES_DICT = {
         "gripper": "PandaGripper",
         "extend_gripper": 0.0,
         "binarized_gripper": False,
-        "GCS_path": "gs://gresearch/robotics/austin_buds_dataset_converted_externally_to_rlds/0.1.0",
+        "GCS_path": "gs://gresearch/robotics/austin_buds_dataset_converted_externally_to_rlds/0.1.0", #remove
         "processing_function": processing_episode.process_episode_austin_buds
     },
     "austin_sailor": {
@@ -99,7 +99,7 @@ ROBOT_CAMERA_POSES_DICT = {
                 "camera_position": np.array([-0.33533, -0.32647,  0.698]),
                 "roll": 78.1,
                 "pitch": 0,
-                "yaw": 60.55,
+                "yaw": -60.55,
                 "camera_fov": 37.0,
                 "episodes": list(range(0, 365))
             }
@@ -344,7 +344,8 @@ ROBOT_CAMERA_POSES_DICT = {
         "camera_width": 84,
         "robot": "Panda",
         "gripper": "PandaGripper",
-        "extend_gripper": 0.0
+        "extend_gripper": 0.0,
+        "num_episodes": 200,
     },
     "lift": {
         "replay_path": "/home/guanhuaji/mirage/robot2robot/rendering/paired_images/lift",

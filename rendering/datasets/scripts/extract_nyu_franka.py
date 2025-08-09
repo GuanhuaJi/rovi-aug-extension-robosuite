@@ -36,7 +36,8 @@ def main():
     builder = tfds.builder_from_directory(builder_dir=DATASET_GCS_PATH)
     
     # 2) 从 train split 中加载前 20 个 episode，不打乱文件顺序
-    ds = builder.as_dataset(split="train", shuffle_files=False)
+    split_name = "train"
+    ds = builder.as_dataset(split=split_name, shuffle_files=False)
     
     # 3) 遍历每个 episode
     for episode_num, episode in enumerate(ds):
@@ -49,7 +50,7 @@ def main():
         language_instructions = []  # 用于存储语言指令
         
         # 设定当前 episode 的存储路径
-        folder_path = f"../states/nyu_franka/episode_{episode_num}"
+        folder_path = f"../states/nyu_franka/{split_name}_episode_{episode_num}"
         os.makedirs(folder_path, exist_ok=True)
         
         # 创建用于存放图像的文件夹

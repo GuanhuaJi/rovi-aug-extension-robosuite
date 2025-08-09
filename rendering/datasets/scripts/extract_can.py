@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image
 
 def main():
-    hdf5_path = "/home/jiguanhua/mirage/robot2robot/image84/can/image_84.hdf5"
+    hdf5_path = "/home/harshapolavaram/mirage/image84/can/image_84.hdf5"
     demokey_pairing = []
 
     with h5py.File(hdf5_path, "r") as f:
@@ -29,18 +29,18 @@ def main():
             # Gripper state (T, 2)
             robot0_gripper_qpos = obs_group["robot0_gripper_qpos"][:]
             # Camera frames (T, H, W, 3)
-            agentview_images = obs_group["agentview_image_sawyer"][:]  
+            agentview_images = obs_group["agentview_image"][:]  
 
             # Combine EEF pos+quat to one array (T, 7), if desired
             ee_states = np.concatenate([robot0_eef_pos, robot0_eef_quat], axis=-1)
 
             # --- 2) Create output folder structure ---
             # ../states/can/episode_{i}/
-            episode_path = f"../states/can/episode_{i}"
+            episode_path = f"/home/guanhuaji/mirage/robot2robot/rendering/datasets/states/can/episode_{i}"
             os.makedirs(episode_path, exist_ok=True)
 
             # Create an "images" subfolder
-            images_folder = os.path.join(episode_path, "images_sawyer")
+            images_folder = os.path.join(episode_path, "images")
             os.makedirs(images_folder, exist_ok=True)
 
             # --- 3) Save each frame as .jpeg ---

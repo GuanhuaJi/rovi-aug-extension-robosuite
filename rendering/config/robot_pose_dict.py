@@ -18,7 +18,7 @@ ROBOT_POSE_DICT = {
         "Kinova3": np.array([0.08, 0, 0.05]),
     },
     "autolab_ur5": {
-        "Panda": np.array([0, 0.2, 0]),
+        "Panda": np.array([0, 0, 0]),
         "IIWA": np.array([0.02, 0.02, -0.02]),
         "Sawyer": np.array([-0.05, 0.05, 0]),
         "Jaco": np.array([-0.05, 0.02, 0]),
@@ -82,7 +82,7 @@ ROBOT_POSE_DICT = {
         "Kinova3": np.array([0.1, 0, -0.05]),
     },
     "viola": {
-        "Panda": np.array([0, 0, 0.02]),
+        "Panda": np.array([0, 0, 0]),
         "IIWA": np.array([0, 0, 0.2]),
         "Sawyer": np.array([0, 0, 0.05]),
         "Jaco": np.array([-0.01, 0.05, 0.07]),

@@ -289,17 +289,38 @@ class TargetEnvWrapper:
             target_pose_array = data['pos'].copy()
 
         gripper_array = data['grip']
-        for viewpoint in info["viewpoints"]:
-            if episode in viewpoint["episodes"]:
-                camera_reference_position = viewpoint["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
-                roll_deg = viewpoint["roll"]
-                pitch_deg = viewpoint["pitch"]
-                yaw_deg = viewpoint["yaw"]
-                fov = viewpoint["camera_fov"]
-                r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
-                camera_reference_quaternion = r.as_quat()
-                camera_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
-                break
+        if robot_dataset == "can":
+            camera_pose = np.array([0.9, 0.1, 1.75, 0.271, 0.271, 0.653, 0.653])
+            # cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+            # fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+        elif robot_dataset == "lift":
+            camera_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+        elif robot_dataset == "square":
+            camera_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+        elif robot_dataset == "stack":
+            camera_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+        elif robot_dataset == "three_piece_assembly":
+            camera_pose = np.array([0.713078462147161, 2.062036796036723e-08, 1.5194726087166726, 0.293668270111084, 0.2936684489250183, 0.6432408690452576, 0.6432409286499023])
+            cam_id = self.source_env.camera_wrapper.env.sim.model.camera_name2id("agentview")
+            fov = self.source_env.camera_wrapper.env.sim.model.cam_fovy[cam_id]
+        else:
+            for viewpoint in info["viewpoints"]:
+                if episode in viewpoint["episodes"]:
+                    camera_reference_position = viewpoint["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
+                    roll_deg = viewpoint["roll"]
+                    pitch_deg = viewpoint["pitch"]
+                    yaw_deg = viewpoint["yaw"]
+                    fov = viewpoint["camera_fov"]
+                    r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
+                    camera_reference_quaternion = r.as_quat()
+                    camera_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
+                    break
         robot_disp = None
 
         if load_displacement:
@@ -311,7 +332,8 @@ class TargetEnvWrapper:
                 print(f"WARNING: displacement file not found → {offset_file}; "
                     f"using default [0, 0, 0].")
         else:
-            robot_disp = ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
+            #robot_disp = ROBOT_POSE_DICT[robot_dataset][self.target_name]['displacement']
+            robot_disp = np.zeros(3, dtype=np.float32)
 
         camera_pose[:3] -= robot_disp
         if robot_dataset == "iamlab_cmu":
@@ -332,8 +354,8 @@ class TargetEnvWrapper:
         gripper_width_list = []
         success = True
 
-        if ROBOT_POSE_DICT[robot_dataset][self.target_name]['safe_angle'] is not None:
-            self.target_env.set_robot_joint_positions(ROBOT_POSE_DICT[robot_dataset][self.target_name]['safe_angle'])
+        # if ROBOT_POSE_DICT[robot_dataset][self.target_name]['safe_angle'] is not None:
+        #     self.target_env.set_robot_joint_positions(ROBOT_POSE_DICT[robot_dataset][self.target_name]['safe_angle'])
         
         for pose_index in range(num_robot_poses):
             target_pose=target_pose_array[pose_index].copy()
@@ -508,8 +530,8 @@ if __name__ == "__main__":
         
         if args.robot_dataset is not None:
             robot_dataset_info = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
-            camera_height = robot_dataset_info["camera_heights"]
-            camera_width = robot_dataset_info["camera_widths"]
+            camera_height = robot_dataset_info["camera_height"]
+            camera_width = robot_dataset_info["camera_width"]
         else:
             camera_height = 256
             camera_width = 256
@@ -546,6 +568,9 @@ if __name__ == "__main__":
             python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "nyu_franka" --target_robot "Jaco" --partition 0
             python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "ucsd_kitchen_rlds" --target_robot "Sawyer" --partition 0
             python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "utokyo_pick_and_place" --target_robot "Sawyer" --partition 0
+
+            python /home/guanhuaji/mirage/robot2robot/rendering/generate_target_robot_images.py --robot_dataset "can" --target_robot "Sawyer" --partition 0
+
             '''
 
         os.makedirs(os.path.join(save_paired_images_folder_path, "source_robot_states", f"{target_name}", "end_effector"), exist_ok=True) 

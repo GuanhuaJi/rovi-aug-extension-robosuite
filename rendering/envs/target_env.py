@@ -22,9 +22,11 @@ class TargetEnvWrapper:
     def __init__(self, target_name, target_gripper, robot_dataset, camera_height=256, camera_width=256):
         self.target_env = RobotCameraWrapper(robotname=target_name, grippername=target_gripper, robot_dataset=robot_dataset, camera_height=camera_height, camera_width=camera_width)
         self.target_name = target_name
-        self.camera_height = camera_height
-        self.camera_width = camera_width
-    
+        # self.camera_height = camera_height
+        # self.camera_width = camera_width
+        self.camera_height = 84
+        self.camera_width = 84
+
     def generate_image(
         self,
         save_paired_images_folder_path="paired_images",
@@ -35,24 +37,38 @@ class TargetEnvWrapper:
         episode=0,
         dry_run=False,
     ):
+        print(robot_dataset, robot_disp, episode)
         data = np.load(os.path.join(source_robot_states_path, "source_robot_states", f"{episode}.npz"), allow_pickle=True)
         info = ROBOT_CAMERA_POSES_DICT[robot_dataset]
         target_pose_array = data['pos'].copy()
 
+
         gripper_array = data['grip']
-        for viewpoint in info["viewpoints"]:
-            if episode in viewpoint["episodes"]:
-                camera_reference_position = viewpoint["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
-                roll_deg = viewpoint["roll"]
-                pitch_deg = viewpoint["pitch"]
-                yaw_deg = viewpoint["yaw"]
-                fov = viewpoint["camera_fov"]
-                r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
-                camera_reference_quaternion = r.as_quat()
-                camera_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
-                break
+        if robot_dataset == "can":
+            camera_pose = np.array([0.9, 0.1, 1.75, 0.271, 0.271, 0.653, 0.653])
+        elif robot_dataset == "lift":
+            camera_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+        elif robot_dataset == "square":
+            camera_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+        elif robot_dataset == "stack":
+            camera_pose = np.array([0.45, 0, 1.35, 0.271, 0.271, 0.653, 0.653])
+        elif robot_dataset == "three_piece_assembly":
+            camera_pose = np.array([0.713078462147161, 2.062036796036723e-08, 1.5194726087166726, 0.293668270111084, 0.2936684489250183, 0.6432408690452576, 0.6432409286499023])
+        else:
+            for viewpoint in info["viewpoints"]:
+                if episode in viewpoint["episodes"]:
+                    camera_reference_position = viewpoint["camera_position"] + np.array([-0.6, 0.0, 0.912]) 
+                    roll_deg = viewpoint["roll"]
+                    pitch_deg = viewpoint["pitch"]
+                    yaw_deg = viewpoint["yaw"]
+                    fov = viewpoint["camera_fov"]
+                    r = R.from_euler('xyz', [roll_deg, pitch_deg, yaw_deg], degrees=True)
+                    camera_reference_quaternion = r.as_quat()
+                    camera_pose = np.concatenate((camera_reference_position, camera_reference_quaternion))
+                    break
         if robot_disp is None:
-            robot_disp = ROBOT_POSE_DICT[robot_dataset][self.target_name]
+            #robot_disp = ROBOT_POSE_DICT[robot_dataset][self.target_name]
+            robot_disp = np.zeros(3, dtype=np.float32)
 
         camera_pose[:3] -= robot_disp
         
@@ -90,7 +106,7 @@ class TargetEnvWrapper:
         for pose_index in range(num_robot_poses):
             target_pose=target_pose_array[pose_index].copy()
             target_pose[:3] -= robot_disp
-            target_pose = reach_further(target_pose, distance=ROBOT_CAMERA_POSES_DICT[robot_dataset]["extend_gripper"])
+            #target_pose = reach_further(target_pose, distance=ROBOT_CAMERA_POSES_DICT[robot_dataset]["extend_gripper"])
             _, gripper_dist = self.target_env.get_gripper_width_from_qpos()
             attempt = 0
             while (gripper_dist < gripper_array[pose_index] - 0.1 or gripper_dist > gripper_array[pose_index] + 0.1) and attempt < 10:
@@ -134,15 +150,20 @@ class TargetEnvWrapper:
                 video_frames_np = np.stack(video_frames, axis=0)
                 iio.imwrite(
                     mask_path,
-                    mask_frames_np,
+                    mask_frames_np,          # shape (T, 84, 84) or (T, 84, 84, 3)
                     fps=30,
                     codec="libx264",
+                    macro_block_size=1,      # ← disable 16-pixel padding
+                    pixelformat="gray"       # or "yuv420p" if your mask is 3-channel
                 )
+
                 iio.imwrite(
                     video_path,
-                    video_frames_np,
+                    video_frames_np,         # shape (T, 84, 84, 3)
                     fps=30,
                     codec="libx264",
+                    macro_block_size=1,      # ← same here
+                    pixelformat="yuv420p"    # keeps the file widely playable
                 )
             if unlimited == False:
                 print(f"\033[92m[SUCCESS] Generated {self.target_name} – episode {episode}\033[0m")
@@ -181,3 +202,4 @@ class TargetEnvWrapper:
             print(f"\033[91m[FAILURE] Could not reach target pose for {self.target_name} – episode {episode}\033[0m")
             steps = len(target_pose_list)
             return False, suggestion, steps
+

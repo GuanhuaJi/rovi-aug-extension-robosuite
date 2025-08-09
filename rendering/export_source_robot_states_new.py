@@ -102,7 +102,10 @@ def dispatch_episodes(robot_dataset: str,
         )
 
     first_ex = next(iter(ds))
-    img_example = first_ex["steps"].element_spec["observation"]["image"]
+    if robot_dataset == "viola":
+        img_example = first_ex["steps"].element_spec["observation"]["agentview_rgb"]
+    else:
+        img_example = first_ex["steps"].element_spec["observation"]["image"]
     img_h, img_w = img_example.shape[:2]
     num_eps = tf.data.experimental.cardinality(ds).numpy()
 
@@ -131,7 +134,10 @@ def dispatch_episodes(robot_dataset: str,
             batched_steps = stack_steps(ex["steps"])
             states, frames = proc_fn({"steps": batched_steps})
             states = states.numpy()
-            joints, grip = states[:, :7], states[:, 7]
+            if robot_dataset == "autolab_ur5":
+                joints, grip = states[:, :6], states[:, 6]
+            else:
+                joints, grip = states[:, :7], states[:, 7]
             mp4_path = oxe_videos_dir / f"{idx}.mp4"
             iio.imwrite(mp4_path, frames, fps=30, codec="libx264")
             if verbose:
@@ -165,5 +171,10 @@ if __name__ == "__main__":
 
 '''
 python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states_new.py --robot_dataset=ucsd_kitchen_rlds --workers=20 --chunksize=40
+python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states_new.py --robot_dataset=toto --workers=20 --chunksize=40
+python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states_new.py --robot_dataset=viola --workers=20 --chunksize=40
+
+python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states_new.py --robot_dataset=austin_mutex --workers=20 --chunksize=40
+
 python /home/guanhuaji/mirage/robot2robot/rendering/export_source_robot_states_new.py --robot_dataset=nyu_franka --workers=20 --chunksize=40
 '''
