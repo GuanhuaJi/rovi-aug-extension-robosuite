@@ -171,4 +171,6 @@ if __name__ == "__main__":
 
 '''
 python export_source_robot_states.py --robot_dataset=nyu_franka --workers=20 --chunksize=40
+
+conda create -n test-robosuite python=3.10 -y
 '''

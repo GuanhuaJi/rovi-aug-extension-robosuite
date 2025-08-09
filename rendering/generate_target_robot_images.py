@@ -319,5 +319,5 @@ if __name__ == "__main__":
 
 
 '''
-python generate_target_robot_images.py --robot_dataset can --target_robot UR5e --num_workers 20
+python /home/guanhuaji/OXE-Aug/rendering/generate_target_robot_images.py --robot_dataset can --target_robot UR5e --num_workers 20
 '''
