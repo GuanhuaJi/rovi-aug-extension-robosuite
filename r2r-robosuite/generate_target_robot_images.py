@@ -315,9 +315,3 @@ def main() -> None:
 # ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     main()
-
-
-
-'''
-python /home/guanhuaji/OXE-Aug/r2r-robosuite/generate_target_robot_images.py --robot_dataset can --target_robots Panda --num_workers 20
-'''

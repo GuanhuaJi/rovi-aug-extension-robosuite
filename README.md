@@ -49,6 +49,8 @@ python export_source_robot_states_sim.py \
   --end <END_EPISODE>
 ```
 
+Run these commands in the [step_3.sh](scripts/step_3.sh) script to replicate the paper dataset.
+
 ---
 
 ## 4) Replay on multiple robots
@@ -79,6 +81,9 @@ After this step, a folder `replay_videos/` is created under `rovi-aug-extension-
 * `replay_videos/<DATASET>/source_replays`
 * `replay_videos/<DATASET>/Panda_replay_mask`
 
+
+Run these commands in the [step_4.sh](scripts/step_4.sh) script to replicate the paper dataset.
+
 ---
 
 ## 5) Install E2FGVI & run inpainting
@@ -86,7 +91,7 @@ After this step, a folder `replay_videos/` is created under `rovi-aug-extension-
 Create a separate environment for E2FGVI:
 
 ```bash
-cd e2fgvi_inpainting
+cd e2fgvi
 conda create -n e2fgvi python=3.9 -y
 conda activate e2fgvi
 
@@ -109,6 +114,8 @@ python batched_inference_e2fgvi_mp4.py \
 
 The resulting inpainted videos are written under `<output_root>`.
 
+Run these commands in the [step_5.sh](scripts/step_5.sh) script to replicate the paper dataset.
+
 ---
 
 ## 6) Overlay (compose replays onto inpaintings)
@@ -124,6 +131,8 @@ python overlay_sim.py \
   --overwrite
 ```
 
+Run these commands in the [step_6.sh](scripts/step_6.sh) script to replicate the paper dataset.
+
 **Notes**
 
 * `--robots` accepts the same robot names as above. Include only the robots you want to composite.
@@ -133,17 +142,25 @@ python overlay_sim.py \
 
 ## Directory hints
 
-After step 4, you should have a structure like:
+After step 6, you should have a structure like:
 
 ```
 replay_videos/
   <DATASET>/
     source_replays/
+    inpaint/
+    Panda/
     Panda_replay_mask/
+    Panda_replay_video/
+    Sawyer/
+    Sawyer_overlay/            # overlay outputs for Sawyer
+    Sawyer_replay_mask/
+    Sawyer_replay_video/
     ...
+    source_replays/
+    source_robot_states/
+    target_robot_states/
 ```
-
-After step 5, the inpainted outputs live under your chosen `<output_root>`.
 
 ---
 

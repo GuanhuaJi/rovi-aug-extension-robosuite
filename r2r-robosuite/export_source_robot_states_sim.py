@@ -230,9 +230,3 @@ if __name__ == "__main__":
         start=args.start,
         end=args.end,
     )
-
-'''
-python /home/guanhuaji/OXE-Aug/r2r-robosuite/export_source_robot_states_sim.py --robot_dataset=can \
-         --hdf5_path=/home/harshapolavaram/mirage/image84/can/image_84.hdf5 \
-            --workers=10 --chunksize=40
-'''

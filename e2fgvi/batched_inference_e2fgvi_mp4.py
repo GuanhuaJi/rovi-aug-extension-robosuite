@@ -221,15 +221,6 @@ if __name__ == "__main__":
     main()
 
 '''
-python /home/guanhuaji/diffusers-robotic-inpainting/batched_inference_e2fgvi_mp4.py --bg_root /home/guanhuaji/OXE-Aug/replay_videos/can/source_replays --mask_root /home/guanhuaji/OXE-Aug/replay_videos/can/Panda_replay_mask --output_root /home/guanhuaji/OXE-Aug/replay_videos/can/inpaint --dilution 1
-
-python /home/guanhuaji/diffusers-robotic-inpainting/batched_inference_e2fgvi_mp4.py --bg_root /home/guanhuaji/mirage/robot2robot/rendering/paired_images/lift/original_oxe_videos --mask_root /home/guanhuaji/mirage/robot2robot/rendering/paired_images/lift/Panda_replay_mask --output_root /home/guanhuaji/mirage/robot2robot/rendering/paired_images/lift/inpaint --dilution 1
-
-
-python /home/guanhuaji/diffusers-robotic-inpainting/batched_inference_e2fgvi_mp4.py --bg_root /home/guanhuaji/mirage/robot2robot/rendering/paired_images/square/original_oxe_videos --mask_root /home/guanhuaji/mirage/robot2robot/rendering/paired_images/square/Panda_replay_mask --output_root /home/guanhuaji/mirage/robot2robot/rendering/paired_images/square/inpaint --dilution 1
-
-python /home/guanhuaji/diffusers-robotic-inpainting/batched_inference_e2fgvi_mp4.py --bg_root /home/guanhuaji/mirage/robot2robot/rendering/paired_images/stack/original_oxe_videos --mask_root /home/guanhuaji/mirage/robot2robot/rendering/paired_images/stack/Panda_replay_mask --output_root /home/guanhuaji/mirage/robot2robot/rendering/paired_images/stack/inpaint --dilution 1
-
 conda create -n e2fgvi python=3.9 -y
 conda activate e2fgvi
 conda config --env --set channel_priority strict
@@ -238,5 +229,4 @@ pip install mmcv==2.2.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2
 conda install tensorboard matplotlib scikit-image
 conda install tqdm
 pip install -U imageio imageio-ffmpeg
-
 '''
