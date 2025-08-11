@@ -1,0 +1,3002 @@
+[
+  {
+    "episode": 3,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 15,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 11,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 0,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 2,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 4,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 17,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 18,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 1,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 9,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 12,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 7,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 14,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 10,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 19,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 6,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 8,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 16,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 5,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 13,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 20,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 21,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 22,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 24,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 26,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 34,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 36,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 29,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 31,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 33,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 25,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 27,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 35,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 32,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 23,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 28,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 38,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 37,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 30,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 39,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 40,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 42,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 43,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 41,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 44,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 49,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 55,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 46,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 48,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 56,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 47,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 50,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 54,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 45,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 51,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 52,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 53,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 59,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 57,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 58,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 60,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 61,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 64,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 62,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 68,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 65,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 70,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 72,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 75,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 71,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 76,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 63,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 69,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 66,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 67,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 79,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 78,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 74,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 73,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 77,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 80,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 82,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 83,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 81,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 87,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 84,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 93,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 86,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 85,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 89,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 88,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 91,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 92,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 95,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 97,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 98,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 90,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 96,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 94,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 99,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 100,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 102,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 101,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 103,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 108,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 104,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 107,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 116,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 105,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 106,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 118,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 112,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 110,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 115,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 109,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 111,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 113,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 114,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 117,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 119,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 120,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 121,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 122,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 127,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 126,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 128,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 123,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 125,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 133,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 124,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 129,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 132,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 131,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 136,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 135,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 130,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 138,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 137,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 134,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 140,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 139,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 141,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 144,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 142,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 146,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 143,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 152,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 151,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 147,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 145,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 148,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 150,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 153,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 149,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 156,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 159,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 158,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 157,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 155,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 160,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 154,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 161,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 167,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 162,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 164,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 168,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 169,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 171,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 165,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 163,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 166,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 170,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 172,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 173,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 175,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 179,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 174,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 178,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 177,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 176,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 181,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 180,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 182,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 183,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 187,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 188,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 190,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 191,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 184,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 185,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 186,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 192,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 194,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 189,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 196,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 197,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 195,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 199,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 193,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  },
+  {
+    "episode": 198,
+    "tried_offsets": [
+      [
+        0.025,
+        0.0,
+        0.0
+      ]
+    ],
+    "working_offset": [
+      0.025,
+      0.0,
+      0.0
+    ]
+  }
+]
