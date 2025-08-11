@@ -1,4 +1,4 @@
-# robot2robot
+# Rovi-Aug-extension-robosuite
 
 End-to-end pipeline to replay Robosuite trajectories across multiple robots, generate background inpaintings with E2FGVI, and overlay replays for clean composites.
 
