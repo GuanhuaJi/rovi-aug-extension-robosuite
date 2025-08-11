@@ -12,7 +12,8 @@ from .target_env import TargetEnvWrapper
 
 __all__ = ["SourceEnvWrapper", "TargetEnvWrapper"]
 
-# （可选）IDE 补全友好
+# (Optional) IDE autocompletion friendly
 from importlib import import_module as _imp
 globals()["source_env"] = _imp(f"{__name__}.source_env")
 del _imp
+

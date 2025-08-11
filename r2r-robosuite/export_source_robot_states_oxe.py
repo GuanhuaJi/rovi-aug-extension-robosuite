@@ -52,13 +52,13 @@ def _stack_dict_list(list_of_dicts):
     list_of_dicts : [ {k1: v1_step0, k2: v2_step0, ...},
                       {k1: v1_step1, ...}, ... ]
     return        : {k1: stacked_v1(T,...), k2: ...}
-                   （若 value 仍是 dict，则递归地继续堆叠）
+                   (If a value is still a dict, recursively stack further)
     """
     out = {}
     sample = list_of_dicts[0]
     for k, v0 in sample.items():
         if isinstance(v0, collections.abc.Mapping):
-            # 递归处理子 dict
+            # recursively handle sub-dicts
             out[k] = _stack_dict_list([d[k] for d in list_of_dicts])
         else:
             out[k] = np.stack([d[k] for d in list_of_dicts], axis=0)
@@ -69,8 +69,8 @@ def stack_steps(steps_ds):
     steps_ds : episode['steps']  (tf.data.Dataset)
     return   : dict whose leaves are (T, …) np.ndarray
     """
-    steps_iter = steps_ds.as_numpy_iterator()   # 正规 iterator
-    list_of_dicts = list(steps_iter)            # 全部搬到内存
+    steps_iter = steps_ds.as_numpy_iterator()   # regular iterator
+    list_of_dicts = list(steps_iter)            # load all into memory
     return _stack_dict_list(list_of_dicts)
 
 
@@ -92,9 +92,9 @@ def dispatch_episodes(robot_dataset: str,
     builder = tfds.builder_from_directory(meta["GCS_path"])
     info    = builder.info                # <tfds.core.DatasetInfo ...>
 
-    dataset_name = info.name              # 真实 TFDS 名
+    dataset_name = info.name              # real TFDS name
 
-    # ---------- 再创建 dataset ----------------------------------------
+    # ---------- recreate dataset ----------------------------------------
     ds = builder.as_dataset(
             split="train",
             shuffle_files=False,

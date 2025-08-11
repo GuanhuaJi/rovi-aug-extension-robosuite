@@ -157,7 +157,7 @@ def main() -> None:
     elif args.list_file:
         txt_path = Path(args.dir_root) / "needs_update.txt"
         if not txt_path.is_file():
-            raise SystemExit(f"❌ 未找到列表文件 {txt_path}")
+            raise SystemExit(f"❌ list file {txt_path} not found")
 
         episodes = sorted({
             int(line.strip())
@@ -165,7 +165,7 @@ def main() -> None:
             if line.strip().isdigit()
         })
         if not episodes:
-            print(f"🎉 {txt_path} 中没有合法的 episode ID，已退出。")
+            print(f"🎉 No valid episode ID in {txt_path}, exiting.")
             return
         jobs = [make_pair(str(ep), args.dir_root, args.output_root, args.dilution)
                 for ep in episodes]

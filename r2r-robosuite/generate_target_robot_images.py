@@ -47,7 +47,7 @@ def log_offsets(
         )
 
 
-# 完全静音子进程（Python 打印 + C 层 stdout/stderr）
+# Completely silence child processes (Python prints + C-level stdout/stderr)
 class SuppressOutput:
     def __enter__(self):
         self._devnull = os.open(os.devnull, os.O_WRONLY)
@@ -79,15 +79,15 @@ def generate_one_episode(
     autosearch: bool = False,
 ) -> tuple[str, int, bool]:
     """
-    渲染一个 episode；返回 (robot, episode, success)。
-    子进程内全静音。
+    Render one episode; return (robot, episode, success).
+    Child process is completely silent.
     """
     try:
         with SuppressOutput():
             pick_best_gpu()
             os.environ["MUJOCO_GL"] = "egl"
 
-            # 延迟导入，避免主进程提前污染 stdout/stderr
+            # Lazy import to avoid the main process polluting stdout/stderr early
             from envs import TargetEnvWrapper
 
             H, W = camera_hw
@@ -178,7 +178,7 @@ def generate_one_episode(
                 source_robot_states_path=out_root,
                 robot_dataset=robot_dataset,
                 robot_disp=best_disp,
-                episode=episode,          # 直接用 0/1/2/... 存
+                episode=episode,          # store using 0/1/2/...
                 unlimited=unlimited,
                 dry_run=False,
             )
@@ -188,7 +188,7 @@ def generate_one_episode(
 
             return robot, episode, bool(success)
     except Exception:
-        # 子进程异常也不噪音，主进程视为失败
+        # Child process errors also stay silent; main process treats as failure
         return robot, episode, False
 
 
@@ -209,11 +209,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--autosearch",
         action="store_true",
-        help="对位移做粗网格搜索；未开启时仅使用默认位移",
+        help="Perform coarse grid search on displacement; use default when disabled",
     )
-    # 新增：按 episode 编号选择（闭区间）
-    p.add_argument("--start", type=int, default=None, help="起始 episode 编号（含）")
-    p.add_argument("--end", type=int, default=None, help="结束 episode 编号（含）")
+    # New: select by episode index (inclusive range)
+    p.add_argument("--start", type=int, default=None, help="Start episode index (inclusive)")
+    p.add_argument("--end", type=int, default=None, help="End episode index (inclusive)")
     return p.parse_args()
 
 
@@ -223,21 +223,21 @@ def main() -> None:
     meta = ROBOT_CAMERA_POSES_DICT[args.robot_dataset]
     out_root = Path(meta["replay_path"])
 
-    # 读取 metadata 以确定总 episode 数（默认 0..N-1）
+    # Read metadata to determine total episode count (default 0..N-1)
     dmeta = json.loads((out_root / "dataset_metadata.json").read_text(encoding="utf-8"))
     num_eps = int(dmeta.get("num_episodes") or dmeta["num_episodes_total"])
     H, W = int(dmeta["image_height"]), int(dmeta["image_width"])
 
-    # 计算选择范围（闭区间）
+    # Compute selection range (closed interval)
     s = 0 if args.start is None else max(0, args.start)
     e = (num_eps - 1) if args.end is None else min(num_eps - 1, args.end)
     if s > e:
-        raise ValueError(f"--start ({s}) 必须 ≤ --end ({e})")
+        raise ValueError(f"--start ({s}) must be ≤ --end ({e})")
     episodes = range(s, e + 1)
 
     mp_ctx = mp.get_context("spawn")
 
-    # 任务列表：对每个目标机器人 × episode 生成一项
+    # Task list: generate one item for each target robot × episode
     tasks: list[tuple] = []
     for robot in args.target_robots:
         wl_path = out_root / robot / "whitelist.json"
@@ -265,7 +265,7 @@ def main() -> None:
         print("Nothing to do – all selected episodes already processed.")
         return
 
-    # 提交任务 & 单一进度条；子进程完全静音
+    # Submit tasks & single progress bar; child processes are completely silent
     with ProcessPoolExecutor(max_workers=args.num_workers, mp_context=mp_ctx) as pool:
         futures = []
         fut2tag: dict = {}

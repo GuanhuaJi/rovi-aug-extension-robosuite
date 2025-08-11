@@ -3,10 +3,10 @@ from scipy.spatial.transform import Rotation as R
 
 def _find_spike_ranges(xyz: np.ndarray, thresh: float):
     """
-    返回 [(start, end_exclusive), …]
-    其中 start-1   为最近一次“良好”帧
-         start..end-1 为连续异常帧
-         end        为下一帧良好，或 ==N 表示落在尾部
+    Return [(start, end_exclusive), …]
+    where start-1   is the most recent "good" frame
+          start..end-1 are consecutive abnormal frames
+          end        is the next good frame, or ==N meaning at the tail
     """
     ranges = []
     N = len(xyz)
@@ -20,12 +20,12 @@ def _find_spike_ranges(xyz: np.ndarray, thresh: float):
         start = i
         while i < N and np.abs(xyz[i] - xyz[prev_good]).sum() > thresh:
             i += 1
-        ranges.append((start, i))   # i==N ⇒ 尾段
+        ranges.append((start, i))   # i==N ⇒ tail segment
         prev_good = i if i < N else prev_good
         i += 1
     return ranges
 
-# ---------- 主函数：无限制修复 ----------
+# ---------- Main function: unlimited repair ----------
 def smooth_xyz_spikes(
         pose_array: np.ndarray,
         thresh: float,
@@ -34,17 +34,17 @@ def smooth_xyz_spikes(
         verbose: bool = True
 ) -> np.ndarray:
     """
-    • 任何长度的异常区段都会被尝试修复（已移除 max_gap 限制）
-    • 尾段（右端缺参考）行为由 tail_mode 决定：
-        "copy"   -> 全部复制最后一帧良好 xyz
-        "extrap" -> 线性外推一步的速度
-        "ignore" -> 原样保留
+    • Any length of abnormal segment will be attempted to fix (max_gap limit removed)
+    • Tail behavior (missing right reference) determined by tail_mode:
+        "copy"   -> copy the last good xyz for all
+        "extrap" -> linearly extrapolate one step of velocity
+        "ignore" -> leave as is
     """
     xyz = pose_array[:, :3].copy()
     N   = len(xyz)
 
     def _interp_block(l_idx: int, r_idx: int):
-        """将 (l_idx, r_idx) 之间（不含端点）的 xyz 线性插值"""
+        """Linearly interpolate xyz between (l_idx, r_idx) (excluding endpoints)"""
         gap = r_idx - l_idx - 1
         for k in range(1, gap + 1):
             t = k / (gap + 1)
@@ -60,7 +60,7 @@ def smooth_xyz_spikes(
         for start, end in spike_ranges:
             at_tail = end >= N
 
-            # ---------- (1) 有右端点：直接插值 ----------
+            # ---------- (1) Has a right endpoint: interpolate directly ----------
             if not at_tail:
                 _interp_block(start - 1, end)
                 fixed_this_pass = True
@@ -68,21 +68,21 @@ def smooth_xyz_spikes(
                     print(f"  ↳ fixed frames {start}…{end-1}  (gap={end-start})")
                 continue
 
-            # ---------- (2) 尾段 ----------
+            # ---------- (2) Tail segment ----------
             if tail_mode == "copy":
-                xyz[start:N] = xyz[start - 1]          # 全部复制上一帧
+                xyz[start:N] = xyz[start - 1]          # copy the previous frame for all
                 fixed_this_pass = True
                 if verbose:
                     print(f"  ↳ copied last good xyz to tail frames {start}…{N-1}")
             elif tail_mode == "extrap":
-                # 使用上一帧速度估计
+                # Estimate using previous frame's velocity
                 vel = xyz[start - 1] - xyz[start - 2] if start >= 2 else 0
                 for k in range(start, N):
                     xyz[k] = xyz[start - 1] + (k - start + 1) * vel
                 fixed_this_pass = True
                 if verbose:
                     print(f"  ↳ extrapolated tail frames {start}…{N-1}")
-            # "ignore": 不修复
+            # "ignore": do not fix
 
         fixed_any |= fixed_this_pass
         if not fixed_this_pass:
@@ -90,7 +90,7 @@ def smooth_xyz_spikes(
                 print(f"[SPIKE] pass {p}: no fixable spikes, stopping\n")
             break
 
-    # ---- 写回并打印剩余异常区段 -----------------------------------------
+    # ---- Write back and print remaining abnormal segments -----------------------------------------
     pose_array[:, :3] = xyz
     remaining = _find_spike_ranges(xyz, thresh)
     if verbose:
@@ -106,6 +106,6 @@ def reach_further(eef, distance=0.07):
     eef_quat = eef[3:7]  # (x, y, z, w)
     eef_rot = R.from_quat(eef_quat)  # (x, y, z, w)
     rot_mat = eef_rot.as_matrix()
-    forward = rot_mat[:, 2]     # 可以改成 [:, 0] or [:, 1] 取决于你定义的方向
+    forward = rot_mat[:, 2]     # can change to [:, 0] or [:, 1] depending on your forward direction definition
     target_pos = eef_pos + distance * forward
     return np.concatenate((target_pos, eef_quat))

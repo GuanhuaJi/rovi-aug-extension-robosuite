@@ -3,18 +3,18 @@
 """
 multi_gpu_e2fgvi_mp4.py
 
-Multi-GPU E2FGVI-HQ runner (process version, tqdm 全局进度).
+Multi-GPU E2FGVI-HQ runner (process version, tqdm global progress).
 
-用法示例
+Usage example
 --------
-# 静默成功输出，失败时打印错误
+# Silent on success, print errors on failure
 python multi_gpu_e2fgvi_mp4.py \
     --bg_root   /path/to/bg_videos \
     --mask_root /path/to/mask_videos \
     --output_root /path/to/out \
     --gpus 0 1 --dilution 1
 
-# 调试模式：始终打印 demo.py 输出
+# Debug mode: always print demo.py output
 python multi_gpu_e2fgvi_mp4.py ... -v
 """
 from __future__ import annotations
@@ -66,10 +66,10 @@ def run_subprocess(bg_video: str, mask_video: str,
     env["PYTHONWARNINGS"] = "ignore::DeprecationWarning"
 
     if verbose:
-        # 把 demo.py 输出实时打到终端
+        # Stream demo.py output to terminal in real time
         subprocess.run(cmd, check=True, env=env)
     else:
-        # 捕获输出；失败时抛出并带上日志
+        # Capture output; raise with log on failure
         result = subprocess.run(
             cmd, env=env, text=True,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT
@@ -103,7 +103,7 @@ def worker_proc(gpu_id: int, job_q: JoinableQueue,
                         dilution, row_base + job_idx, verbose)
             job_idx += 1
         except Exception as e:
-            # 将错误/日志打印出来
+            # Print error/log output
             print(f"[GPU {gpu_id}] ❌ Episode {ep_id} failed:\n{e}\n{'─'*60}")
             try:
                 with open(failed_file, "a", encoding="utf-8") as ff:
@@ -159,11 +159,11 @@ def main() -> None:
     elif args.list_file:
         txt_path = Path(args.bg_root) / "needs_update.txt"
         if not txt_path.is_file():
-            sys.exit(f"❌ 列表文件 {txt_path} 不存在")
+            sys.exit(f"❌ list file {txt_path} does not exist")
         episodes = sorted({int(x) for x in txt_path.read_text().splitlines()
                            if x.strip().isdigit()})
         if not episodes:
-            print(f"🎉 {txt_path} 中没有合法 episode id, 已退出。")
+            print(f"🎉 No valid episode id in {txt_path}, exiting.")
             return
         jobs = [make_pair(str(ep), args.bg_root, args.mask_root,
                           args.output_root, args.dilution) for ep in episodes]

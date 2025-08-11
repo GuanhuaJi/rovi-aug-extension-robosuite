@@ -17,20 +17,20 @@
 
 # class Empty(ManipulationEnv):
 #     def _load_model(self):
-#         # 1️⃣ 先创建 robot wrappers → self.robots
-#         self._load_robots()                    # 必不可少
+#         # 1️⃣ first create robot wrappers → self.robots
+#         self._load_robots()                    # essential
 
 #         # 2️⃣ Arena
 #         self.arena = EmptyArena()
 
-#         # 3️⃣ 取出 **robot_model** 列表
+#         # 3️⃣ extract **robot_model** list
 #         robot_xmls = [r.robot_model for r in self.robots]
 
-#         # 4️⃣ 创建 Task（注意新版参数名）
+#         # 4️⃣ create Task (note new parameter names)
 #         self.model = ManipulationTask(
 #             mujoco_arena=self.arena,
 #             mujoco_robots=robot_xmls,
-#             mujoco_objects=[],                # 如有物体再传
+#             mujoco_objects=[],                # pass objects here if any
 #         )
 
 # from robosuite.environments.base import register_env
@@ -87,7 +87,7 @@
 #             return 2.0 * finger_qpos[0], np.clip(2.0 * finger_qpos[0] / 2.2, 0, 1) # close 0 -> open 2.2
         
 #     def get_gripper_width(self):
-#     # 直接读取本次环境观测
+#     # directly read current environment observation
 #         return self.env._observables["robot0_gripper_qpos"].obs[0]
         
 
@@ -191,7 +191,7 @@
 #                             width=640, height=480,
 #                             white_background=True):
 #         sim = self.env.sim
-#         sim.forward()                                           # 同步姿态
+#         sim.forward()                                           # synchronize pose
 
 #         rgb = sim.render(width=width, height=height,
 #                         camera_name=camera)[::-1]

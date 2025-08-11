@@ -296,8 +296,8 @@ dataset_to_processing_function = {
 
 
 import os, argparse
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"        # 仅用 CPU
-os.environ["TFDS_DISABLE_PROGRESSBAR"] = "1"     # 精简日志
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"        # use CPU only
+os.environ["TFDS_DISABLE_PROGRESSBAR"] = "1"     # concise logs
 
 import tensorflow_datasets as tfds
 import tensorflow as tf
@@ -305,11 +305,11 @@ import numpy as np
 import cv2
 from concurrent.futures import ThreadPoolExecutor
 
-# ---------- 你的 dataset_to_processing_function 必须在此之前已定义 ----------
-# from processing_fns import dataset_to_processing_function  # 仅示例
+# ---------- Your dataset_to_processing_function must be defined before this ----------
+# from processing_fns import dataset_to_processing_function  # example only
 
 def main():
-    # --------- 解析命令行 ----------
+    # --------- Parse command line ----------
     parser = argparse.ArgumentParser(
         description="Load episodes from the Google Research Robotics datasets"
     )
@@ -325,35 +325,35 @@ def main():
                         help="root folder to save extracted frames")
     args = parser.parse_args()
 
-    # --------- 参数一致性检查 ----------
+    # --------- Parameter consistency check ----------
     if args.start is not None and args.start < 0:
-        parser.error("--start 不能为负数。")
+        parser.error("--start must not be negative.")
     if args.end   is not None and args.end   < 0:
-        parser.error("--end 不能为负数。")
+        parser.error("--end must not be negative.")
     if args.start is not None and args.end is not None and args.start > args.end:
-        parser.error("--start 不能大于 --end。")
+        parser.error("--start cannot be greater than --end.")
 
     selecting_by_range = (args.start is not None or args.end is not None)
 
-    # --------- 准备 TFDS builder ----------
+    # --------- Prepare TFDS builder ----------
     builder = tfds.builder_from_directory(
         f"gs://gresearch/robotics/{args.dataset}/0.1.0/"
     )
 
-    # --------- 确定要处理的 split 列表 ----------
-    if selecting_by_range:                           # 仅处理指定 split
+    # --------- Determine list of splits to process ----------
+    if selecting_by_range:                           # process only specified split
         splits_to_process = [args.split]
-    else:                                            # 处理全部 split
+    else:                                            # process all splits
         splits_to_process = list(builder.info.splits.keys())
 
     print(f"\n===== {args.dataset} =====")
 
-    # --------- 遍历每个 split ----------
+    # --------- Iterate over each split ----------
     for split_name, split_info in builder.info.splits.items():
         if split_name not in splits_to_process:
-            continue                                # 跳过不在目标列表中的 split
+            continue                                # skip splits not in target list
 
-        # ------------- 统计与输出 -------------
+        # ------------- Stats and output -------------
         num_episodes_total = split_info.num_examples
         is_target_split    = (split_name == args.split)
 
@@ -389,7 +389,7 @@ def main():
         print(f"{split_name:<15}: {num_episodes_total:6,d} episodes "
             f"→ planned {num_episodes_plan:6,d} {range_note}")
 
-        # --------- 读取数据集 ----------
+        # --------- Read dataset ----------
         read_config = tfds.ReadConfig(
             interleave_cycle_length=1,     # read shards one by one
             shuffle_seed=None,             # no file shuffling
@@ -402,15 +402,15 @@ def main():
         save_root = f"{args.save_dir}/{args.dataset}"
         os.makedirs(save_root, exist_ok=True)
 
-        # --------- 多线程写 JPEG ----------
+        # --------- Multithreaded JPEG writing ----------
         needs_update = []
         with ThreadPoolExecutor(max_workers=os.cpu_count() * 2) as pool:
-            for ep_idx, ep in enumerate(ds,    # ep_idx 已经是切片后的局部索引
+            for ep_idx, ep in enumerate(ds,    # ep_idx is already the sliced local index
                                       start=(args.start or 0)
                                       if selecting_by_range and split_name == args.split
                                       else 0):
                 # ----------------------------------------------------------
-                # ① 取出 steps → 应用自定义处理函数
+                # ① Extract steps → apply custom processing function
                 # ----------------------------------------------------------
                 step_ds = (
                     ep["steps"]
@@ -419,18 +419,18 @@ def main():
                     .prefetch(tf.data.AUTOTUNE)
                 )
 
-                # ② 转成 numpy
+                # ② Convert to numpy
                 episode_states, episode_imgs = [], []
                 for s, img in tfds.as_numpy(step_ds):
                     episode_states.append(s)
                     episode_imgs.append(img)
 
-                # ③ 建立目录并并行写帧
+                # ③ Create directory and write frames in parallel
                 frames_dir = f"{save_root}/{split_name}/{ep_idx}/frames"
                 frame_paths = sorted(Path(frames_dir).glob("*.jpg"), key=numeric_key)
 
-                # ---------- 是否可跳过写盘 ----------
-                tol_mean   = 3.0                 # 均值差 < 3 视作相同
+                # ---------- Check if disk write can be skipped ----------
+                tol_mean   = 3.0                 # mean difference < 3 considered identical
                 n_compare  = 5 if len(episode_imgs) >= 10 else len(episode_imgs)
                 skip_write = False
 
@@ -441,7 +441,7 @@ def main():
                 def _mean_error(a: np.ndarray, b: np.ndarray) -> float:
                     return np.abs(a.astype(np.int16) - b.astype(np.int16)).mean()
 
-                if len(frame_paths) == len(episode_imgs):   # 长度一致才比较像素
+                if len(frame_paths) == len(episode_imgs):   # only compare pixels if lengths match
                     mean_errors = [
                         _mean_error(_load_rgb(i), episode_imgs[i])
                         for i in range(n_compare)
@@ -456,8 +456,8 @@ def main():
                     print(f"{split_name} ep {ep_idx}: already up‑to‑date (Δ < {tol_mean})")
                     continue
 
-                # ---------- 写盘 ----------
-                # 先清空旧帧
+                # ---------- Write to disk ----------
+                # clear old frames first
                 for old_jpg in frame_paths:
                     old_jpg.unlink()
                 Path(frames_dir).mkdir(parents=True, exist_ok=True)
@@ -474,7 +474,7 @@ def main():
 
                 print(f"{split_name} ep {ep_idx}: saved {len(episode_imgs)} frames")
 
-        # ---------- 写 needs_update.txt ----------
+        # ---------- Write needs_update.txt ----------
         list_path = Path(save_root) / split_name / "needs_update.txt"
         list_path.parent.mkdir(parents=True, exist_ok=True)
         list_path.write_text("\n".join(map(str, needs_update)))
