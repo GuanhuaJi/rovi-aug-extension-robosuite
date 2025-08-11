@@ -12,7 +12,7 @@ End-to-end pipeline to replay Robosuite trajectories across multiple robots, gen
 # └─ mirage-robosuite/
 
 # create the main env
-cd rovi-aug-extension-robosuite
+cd r2r-robosuite
 conda env create -f environment.yml
 conda activate r2r-robosuite
 
@@ -32,7 +32,7 @@ Download the original simulation data here: **LINK**
 
 ## 3) Extract properties & compute target EEF
 
-From `rovi-aug-extension-robosuite/rendering`:
+From `r2r-robosuite/rendering`:
 
 ```bash
 # Process all episodes
