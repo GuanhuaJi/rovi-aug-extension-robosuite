@@ -96,29 +96,29 @@ def get_ref_index(f, neighbor_ids, length):
 
 def read_mask(mask_path: str, size: tuple[int, int], dilation_iter: int):
     """
-    读取遮罩，既支持目录(每帧一张图)也支持 mp4 视频。
-    返回值：List[PIL.Image]，元素为单通道掩码(0/255)且已 resize。
+    Read masks, supporting both a directory (one image per frame) and mp4 video.
+    Returns: List[PIL.Image], each a single-channel mask (0/255) already resized.
     """
     kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
     masks  = []
 
     if mask_path.endswith(".mp4"):
-        # ---------- 逐帧读 MP4 ----------
+        # ---------- Read MP4 frame by frame ----------
         cap, ok = cv2.VideoCapture(mask_path), True
         while ok:
             ok, frame = cap.read()
             if not ok:
                 break
-            # 若 mask 视频是彩色/灰度均可，统一转为单通道
+            # If mask video is color or grayscale, convert to single channel
             m = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             m = cv2.resize(m, size, interpolation=cv2.INTER_NEAREST)
-            m = (m > 127).astype(np.uint8)          # 二值化
+            m = (m > 127).astype(np.uint8)          # binarize
             if dilation_iter:
                 m = cv2.dilate(m, kernel, iterations=dilation_iter)
             masks.append(Image.fromarray(m * 255))
         cap.release()
     else:
-        # ---------- 原始目录逻辑 ----------
+        # ---------- Original directory logic ----------
         names = sorted(os.listdir(mask_path), key=natural_sort_key)
         for name in names:
             m = Image.open(os.path.join(mask_path, name)).resize(size, Image.NEAREST)
@@ -151,11 +151,11 @@ def make_overlay(frame_np: np.ndarray,
                  color=(0, 255, 0),
                  alpha: float = 0.45) -> np.ndarray:
     """
-    帧 + mask ⇒ 半透明可视化
-    frame_np : H×W×3、uint8、RGB
-    mask_np  : H×W、bool / {0,1}
-    color    : BGR 颜色；默认绿色方便区分
-    alpha    : 遮罩的不透明度
+    Frame + mask ⇒ semi-transparent visualization
+    frame_np : H×W×3, uint8, RGB
+    mask_np  : H×W, bool / {0,1}
+    color    : BGR color; default green for distinction
+    alpha    : mask opacity
     """
     overlay = frame_np.copy()
     color_layer = np.zeros_like(overlay)

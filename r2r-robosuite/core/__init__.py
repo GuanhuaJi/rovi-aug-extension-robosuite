@@ -32,8 +32,9 @@ __all__ = [
     "reach_further",
 ]
 
-# （可选）让 IDE / REPL 补全时能看到子模块本身
+# (Optional) allow IDE / REPL autocompletion to see submodules themselves
 from importlib import import_module as _imp
 for _name in ("gpu", "physics", "geometry", "io"):
     globals()[_name] = _imp(f"{__name__}.{_name}")
 del _imp, _name
+

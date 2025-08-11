@@ -15,7 +15,7 @@ from pathlib import Path
 import imageio.v3 as iio
 
 
-STEP_MAX = 0.02          # 单帧允许的最大 L1 位移（米），1 cm
+STEP_MAX = 0.02          # Maximum allowed L1 displacement per frame (m), 1 cm
 ORI_LERP = False
 
 class TargetEnvWrapper:

@@ -150,7 +150,7 @@ class RobotCameraWrapper:
                             width=640, height=480,
                             white_background=True):
         sim = self.env.sim
-        sim.forward()                                           # 同步姿态
+        sim.forward()                                           # synchronize pose
 
         rgb = sim.render(width=width, height=height,
                         camera_name=camera)[::-1]

@@ -29,7 +29,7 @@ class VideoWriter:
     def __init__(self, path: Path, fps: int, shape_hw: tuple[int, int]):
         self.writer = iio.get_writer(
             path,
-            format="pyav",        # ← 指定后端
+            format="pyav",        # specify backend
             fps=fps,
             codec="libx264",
             pixelformat="yuv420p",

@@ -210,13 +210,13 @@ def process_directory(input_dir, output_dir):
         convert_image(input_path, output_path)
         
 def worker_fn(episodes, directory, gpu_idx, super_resolution, counter):
-    # 把子进程所有输出重定向到 /dev/null
+    # Redirect all child process output to /dev/null
     if MUTE_OUTPUT:
         devnull = open(os.devnull, "w")
         sys.stdout = devnull
         sys.stderr = devnull
 
-    # 绑定指定 GPU
+    # Bind to specified GPU
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_idx)
 
     import torch
@@ -225,19 +225,19 @@ def worker_fn(episodes, directory, gpu_idx, super_resolution, counter):
     from sam2.sam2_image_predictor import SAM2ImagePredictor
     device = torch.device("cuda")
 
-    # PyTorch 淡入式设置
+    # PyTorch configuration
     if device.type == "cuda":
         torch.autocast("cuda", dtype=torch.bfloat16).__enter__()
         if torch.cuda.get_device_properties(0).major >= 8:
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32  = True
 
-    # 构建模型
+    # Build model
     vid_predictor = build_sam2_video_predictor(MODEL_CONFIG, MODEL_CHECKPOINT, device=device)
     sam2_model    = build_sam2(MODEL_CONFIG, MODEL_CHECKPOINT, device=device)
     img_predictor = SAM2ImagePredictor(sam2_model)
 
-    # 逐 episode 处理
+    # Process episode by episode
     for ep in episodes:
         ep_dir = Path(directory) / str(ep)
         merge_dir = ep_dir / ("super_resolution_mask_frames" if super_resolution else "mask_frames")
@@ -247,56 +247,56 @@ def worker_fn(episodes, directory, gpu_idx, super_resolution, counter):
         bk_mp4     = ep_dir / "trajectory_background.mp4"
         mask_dir   = ep_dir / ("super_resolution_mask_frames" if super_resolution else "mask_frames")
 
-        # a) 分割 & 合成
+        # a) segmentation & compositing
         src_frames = ep_dir / ("super_resolution_frames" if super_resolution else "frames")
         best_image_to_video_validation(str(src_frames), str(replay_mp4), str(bk_mp4),
                                        vid_predictor, img_predictor)
-        # b) 抽帧
+        # b) extract frames
         extract_frames(str(replay_mp4), str(replay_dir))
-        # c) 生成二值 mask
+        # c) generate binary mask
         process_directory(str(replay_dir), str(mask_dir))
 
-        # 更新全局计数器
+        # update global counter
         with counter.get_lock():
-            counter.value += 1   # 已完成 episode +1
+            counter.value += 1   # episode completed +1
 
-# ────────────────────────── 主入口 ──────────────────────────
+# ────────────────────────── Main entry ──────────────────────────
 def main():
-    parser = argparse.ArgumentParser(description="按 episode 范围或自动发现方式并行调用 worker_fn")
-    parser.add_argument('--start', type=int, default=None, help='起始 episode（含）')
-    parser.add_argument('--end',   type=int, default=None, help='结束 episode（不含）')
+    parser = argparse.ArgumentParser(description="Parallel call to worker_fn by episode range or auto discovery")
+    parser.add_argument('--start', type=int, default=None, help='Start episode (inclusive)')
+    parser.add_argument('--end',   type=int, default=None, help='End episode (exclusive)')
     parser.add_argument('--directory', type=str, required=True,
-                        help='数据根目录，每个 episode 是一个纯数字子目录')
+                        help='Root directory of data; each episode is a numeric subdirectory')
     parser.add_argument('--num_workers', type=int, default=8,
-                        help='并行进程 / GPU 数量 (≤ 可见 GPU 数)')
-    parser.add_argument('--super_resolution', action='store_true', help='是否启用超分辨率处理')
+                        help='Number of parallel processes / GPUs (≤ visible GPUs)')
+    parser.add_argument('--super_resolution', action='store_true', help='Whether to enable super-resolution processing')
     parser.add_argument('--list-file', action='store_true',
-                        help='从 {directory}/needs_update.txt 读取 episode 列表')
+                        help='Read episode list from {directory}/needs_update.txt')
     args = parser.parse_args()
 
-    # — 生成待处理 episode 列表 —
+    # — Generate list of episodes to process —
     if args.start is not None and args.end is not None:
         episodes = list(range(args.start, args.end))
     elif args.list_file:
         txt_path = Path(args.directory) / "needs_update.txt"
         if not txt_path.is_file():
-            raise SystemExit(f"未找到列表文件 {txt_path}")
+            raise SystemExit(f"List file {txt_path} not found")
         episodes = sorted({int(l) for l in txt_path.read_text().splitlines() if l.strip().isdigit()})
     else:
         episodes = sorted(int(p.name) for p in Path(args.directory).iterdir()
                           if p.is_dir() and p.name.isdigit())
     if not episodes:
-        raise SystemExit("未发现任何 episode 目录")
+        raise SystemExit("No episode directories found")
 
     total = len(episodes)
     chunks = [[] for _ in range(args.num_workers)]
     for idx, ep in enumerate(episodes):
         chunks[idx % args.num_workers].append(ep)
 
-    # 共享计数器
+    # Shared counter
     counter = mp.Value('i', 0)
 
-    # 启动子进程
+    # Launch child processes
     procs = []
     for gpu_idx, ep_chunk in enumerate(chunks):
         if not ep_chunk:
@@ -308,24 +308,24 @@ def main():
         p.start()
         procs.append(p)
 
-    # 单一 tqdm 进度条
+    # Single tqdm progress bar
     last = 0
-    with tqdm(total=total, desc="Episodes 完成进度", unit="ep") as pbar:
+    with tqdm(total=total, desc="Episodes progress", unit="ep") as pbar:
         while any(p.is_alive() for p in procs):
-            time.sleep(1)  # 刷新频率 1 s
+            time.sleep(1)  # refresh rate 1 s
             with counter.get_lock():
                 done = counter.value
             if done > last:
                 pbar.update(done - last)
                 last = done
-        # 避免极少数 race condition
+        # avoid rare race condition
         pbar.update(total - last)
 
-    # 等待子进程退出
+    # Wait for child processes to exit
     for p in procs:
         p.join()
 
-    print("✅ 全部 episode 处理完成")
+    print("✅ All episodes processed")
 
 if __name__ == "__main__":
     main()

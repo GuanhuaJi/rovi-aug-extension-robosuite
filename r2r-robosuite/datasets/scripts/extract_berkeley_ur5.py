@@ -28,41 +28,41 @@ FeaturesDict({
 })
 '''
 
-# 指定数据集所在路径（GCS 或本地目录）
+# Specify dataset path (GCS or local directory)
 DATASET_GCS_PATH = "gs://gresearch/robotics/berkeley_autolab_ur5/0.1.0"
 
 def main():
-    # 1) 从指定目录创建 builder（数据集已准备好，无需重新 download_and_prepare()）
+    # 1) Create builder from specified directory (dataset already prepared; no need to download_and_prepare())
     builder = tfds.builder_from_directory(builder_dir=DATASET_GCS_PATH)
     
-    # 2) 从 train split 中加载前 20 个 episode（不打乱文件顺序）
+    # 2) Load first 20 episodes from train split (keep file order)
     ds = builder.as_dataset(split="train", shuffle_files=False)
     
-    # 3) 遍历每个 episode
+    # 3) Iterate over each episode
     for episode_num, episode in enumerate(ds):
         print(f"[INFO] Processing Episode {episode_num}")
         
-        # 初始化列表用于存储各步数据
-        joint_states_list = []    # 关节角（joint state）：取 robot_state 的前 6 个元素
-        gripper_states_list = []  # gripper 状态（breaper state）：取 robot_state 的第 7 个元素（保持 (1,) 数组形式）
-        ee_states_list = []       # end-effector 状态（EE state）：取 robot_state 的后 8 个元素
-        actions_list = []        # 动作（action）：取 action 的前 7 个元素
-        language_instructions_list = []  # 语言指令（language instruction）：取 observation 中的 natural_language_instruction
+        # Initialize lists to store data for each step
+        joint_states_list = []    # joint angles: take first 6 elements of robot_state
+        gripper_states_list = []  # gripper state: take 7th element of robot_state (keep as (1,) array)
+        ee_states_list = []       # end-effector state: take last 8 elements of robot_state
+        actions_list = []        # action: take first 7 elements of action
+        language_instructions_list = []  # language instruction: from observation's natural_language_instruction
         
-        # 设定当前 episode 存储路径
+        # Set storage path for current episode
         folder_path = f"../states/autolab_ur5/episode_{episode_num}"
         os.makedirs(folder_path, exist_ok=True)
         
-        # 创建用于存放图像的子文件夹
+        # Create subfolder for images
         images_folder = os.path.join(folder_path, "images")
         os.makedirs(images_folder, exist_ok=True)
         
-        # 4) 遍历当前 episode 中的每个 step
+        # 4) Iterate over each step in the current episode
         steps_dataset = episode["steps"]
         for step_idx, step in enumerate(steps_dataset):
-            # 从 observation 中提取 robot_state (15,)
+            # Extract robot_state (15,) from observation
             state = step["observation"]["robot_state"].numpy()
-            # 假设 robot_state 的结构为：[0:6] -> joint angles, [6:7] -> gripper state, [7:15] -> end-effector state
+            # Assume robot_state structure: [0:6] -> joint angles, [6:7] -> gripper state, [7:15] -> end-effector state
             joint_state = state[:6]
             ee_state = state[6:13]
             gripper_state = state[13:14]
@@ -72,25 +72,25 @@ def main():
             gripper_states_list.append(gripper_state)
             ee_states_list.append(ee_state)
             # I want word_vector + rotation_delta + gripper_closedness_action
-            # 取出动作的前 7 个元素
+            # Take first 7 elements of action
             action = step["action"]["world_vector"].numpy()
-            # 取出 gripper_closedness_action
+            # Take gripper_closedness_action
             gripper_closedness_action = [step["action"]["gripper_closedness_action"].numpy()]
-            # 取出 rotation_delta
+            # Take rotation_delta
             rotation_delta = step["action"]["rotation_delta"].numpy()
-            # 将动作、gripper_closedness_action 和 rotation_delta 组合成一个数组
+            # Combine action, gripper_closedness_action and rotation_delta into one array
             action_combined = np.concatenate((action, rotation_delta, gripper_closedness_action), axis=0)
             actions_list.append(action_combined)
             language_instructions_list.append(step["observation"]["natural_language_instruction"].numpy().decode("utf-8"))
             
-            # 5) 提取主摄像头图像 (480, 640, 3)
+            # 5) Extract main camera image (480, 640, 3)
             image_np = step["observation"]["image"].numpy()
             img = Image.fromarray(image_np)
-            # 保存为 JPEG 格式，文件名为 "0.jpeg", "1.jpeg", …（不带前导零）
+            # Save as JPEG, filename "0.jpeg", "1.jpeg", ... (no leading zeros)
             image_filename = os.path.join(images_folder, f"{step_idx}.jpeg")
             img.save(image_filename, format="JPEG")
         
-        # 6) 将列表转换为 numpy 数组，并保存为文本文件
+        # 6) Convert lists to numpy arrays and save as text files
         joint_states_array = np.vstack(joint_states_list)      # shape: (T, 6)
         gripper_states_array = np.vstack(gripper_states_list)  # shape: (T, 1)
         ee_states_array = np.vstack(ee_states_list)              # shape: (T, 8)
