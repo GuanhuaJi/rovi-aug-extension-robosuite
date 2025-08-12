@@ -2,3 +2,7 @@
 	path = e2fgvi
 	url = https://github.com/GuanhuaJi/e2fgvi.git
 	branch = main
+[submodule "mirage-robosuite"]
+	path = mirage-robosuite
+	url = https://github.com/GuanhuaJi/mirage-robosuite.git
+	branch = main
