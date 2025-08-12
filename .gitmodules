@@ -1,0 +1,4 @@
+[submodule "e2fgvi"]
+	path = e2fgvi
+	url = https://github.com/GuanhuaJi/e2fgvi.git
+	branch = main
