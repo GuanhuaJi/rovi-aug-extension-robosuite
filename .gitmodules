@@ -10,3 +10,7 @@
 	path = r2r-robosuite
 	url = https://github.com/GuanhuaJi/r2r-robosuite-sim.git
 	branch = main
+[submodule "sam2"]
+	path = sam2
+	url = https://github.com/GuanhuaJi/sam2.git
+	branch = main
