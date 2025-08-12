@@ -1,4 +1,4 @@
-name: sam2
+name: sam2-test
 channels:
   - defaults
 dependencies:
