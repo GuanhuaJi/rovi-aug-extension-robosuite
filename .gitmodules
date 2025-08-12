@@ -6,3 +6,7 @@
 	path = mirage-robosuite
 	url = https://github.com/GuanhuaJi/mirage-robosuite.git
 	branch = main
+[submodule "r2r-robosuite"]
+	path = r2r-robosuite
+	url = https://github.com/GuanhuaJi/r2r-robosuite-sim.git
+	branch = main
